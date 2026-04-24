@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>💡 Pixel Battle v1.2</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+:root{--bg:#0a0a0f;--panel:#12121a;--border:#2a2a3a;--accent:#f5c542;--green:#4ade80;--red:#ff6b6b;--blue:#60a5fa;--text:#e0e0f0;--dim:#888;}
+html,body{height:100%;width:100%;overflow:hidden;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'VT323',monospace;display:flex;flex-direction:column;position:fixed;inset:0;font-size:15px;}
+input,textarea{font-family:'VT323',monospace;user-select:text!important;-webkit-user-select:text!important;}
+
+/* MAINTENANCE */
+#maint{position:fixed;inset:0;background:#000;z-index:99999;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;}
+#maint.on{display:flex;}
+.mspin{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.mtext{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--accent);text-align:center;line-height:2.5;text-shadow:0 0 15px var(--accent);}
+
+/* BROADCAST */
+#bcast{position:fixed;top:0;left:0;right:0;background:var(--accent);color:#000;font-family:'Press Start 2P',monospace;font-size:8px;padding:8px;text-align:center;z-index:9990;display:none;cursor:pointer;line-height:1.8;}
+
+/* LOGIN */
+#lscreen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
+.lbox{background:var(--panel);border:2px solid var(--accent);border-radius:12px;padding:22px 20px;display:flex;flex-direction:column;gap:10px;width:min(280px,88vw);}
+.llogo{font-family:'Press Start 2P',monospace;font-size:11px;color:var(--accent);text-shadow:0 0 14px var(--accent);text-align:center;line-height:2.2;}
+.inp{background:#1a1a28;border:1px solid var(--border);color:var(--text);font-size:17px;padding:7px 10px;border-radius:5px;outline:none;width:100%;}
+.inp:focus{border-color:var(--accent);}
+.lbtn{background:var(--accent);border:none;color:#000;font-family:'Press Start 2P',monospace;font-size:8px;padding:11px;border-radius:5px;cursor:pointer;width:100%;}
+.lhint{color:var(--dim);font-size:12px;text-align:center;}
+#lerr{color:var(--red);font-size:12px;text-align:center;min-height:15px;}
+
+/* TOP BAR */
+#topbar{background:var(--panel);border-bottom:2px solid var(--accent);padding:0 6px;height:36px;display:flex;align-items:center;gap:4px;flex-shrink:0;z-index:1000;overflow-x:auto;overflow-y:hidden;white-space:nowrap;}
+#topbar::-webkit-scrollbar{display:none;}
+.logo{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);text-shadow:0 0 7px var(--accent);flex-shrink:0;}
+.st{background:#1a1a28;border:1px solid var(--border);padding:1px 5px;border-radius:3px;font-size:13px;display:inline-flex;align-items:center;gap:2px;flex-shrink:0;}
+.v{color:var(--accent);}
+#rbar{width:30px;height:3px;background:#222;border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:1px;}
+#rfill{height:100%;background:var(--blue);width:0%;transition:width 1s linear;}
+#mbtn{background:#1a1a28;border:1px solid var(--border);border-radius:3px;padding:1px 6px;cursor:pointer;font-size:13px;flex-shrink:0;display:inline-flex;align-items:center;gap:2px;}
+
+/* WIPE TIMER */
+#wipetimer{position:fixed;top:42px;right:8px;background:rgba(10,10,20,.92);border:1px solid var(--accent);border-radius:5px;padding:4px 8px;font-family:'Press Start 2P',monospace;font-size:6px;color:var(--accent);z-index:2000;display:flex;flex-direction:column;gap:2px;text-align:center;line-height:1.8;}
+#wipetimer span{color:var(--green);font-size:8px;}
+
+/* ONLINE COUNTER */
+#onlinecounter{position:fixed;top:94px;right:8px;background:rgba(10,10,20,.92);border:1px solid var(--blue);border-radius:5px;padding:4px 8px;font-family:'Press Start 2P',monospace;font-size:6px;color:var(--blue);z-index:2000;display:flex;align-items:center;gap:4px;}
+#onlinecounter span{color:var(--green);font-size:8px;}
+
+/* OFFLINE BOOST INDICATOR */
+#offlinebadge{position:fixed;top:136px;right:8px;background:rgba(10,10,20,.92);border:1px solid var(--green);border-radius:5px;padding:4px 8px;font-family:'Press Start 2P',monospace;font-size:6px;color:var(--green);z-index:2000;display:none;align-items:center;gap:4px;line-height:1.8;}
+
+
+/* MAP */
+#map{flex:1;z-index:1;position:relative;min-height:0;}
+.leaflet-container{background:#0d1a2e!important;}
+#zhint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(10,10,20,.92);color:var(--accent);font-family:'Press Start 2P',monospace;font-size:8px;padding:12px 16px;border-radius:8px;z-index:800;text-align:center;line-height:2;pointer-events:none;display:none;}
+
+/* BOTTOM BAR */
+#bottombar{background:var(--panel);border-top:2px solid var(--border);padding:0 5px;height:52px;display:flex;align-items:center;gap:4px;flex-shrink:0;z-index:1000;overflow-x:auto;overflow-y:hidden;}
+#bottombar::-webkit-scrollbar{display:none;}
+
+/* PALETTE — сетка: 8 цветов в ряд, с прокруткой и выступанием */
+#palwrap{
+  display:flex;
+  align-items:flex-start;
+  gap:2px;
+  flex-shrink:0;
+  position:relative;
+  padding:3px 0;
+}
+#palette{
+  display:grid;
+  grid-template-columns:repeat(8, 22px);
+  grid-auto-rows:22px;
+  gap:3px;
+  max-height:50px;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:3px;
+  margin:-3px;
+  transition:max-height .3s;
+  scrollbar-width:thin;
+  scrollbar-color:var(--accent) #1a1a28;
+}
+#palette::-webkit-scrollbar{
+  width:4px;
+}
+#palette::-webkit-scrollbar-thumb{
+  background:var(--accent);
+  border-radius:2px;
+}
+#palette.exp{
+  max-height:150px;
+}
+.clr{
+  width:22px;
+  height:22px;
+  border-radius:4px;
+  border:2px solid #444;
+  cursor:pointer;
+  flex-shrink:0;
+  position:relative;
+  transition:transform 0.1s;
+  z-index:10;
+}
+.clr:hover{
+  transform:scale(1.15);
+  z-index:20;
+  border-color:#fff !important;
+}
+.clr.on{
+  border-color:#fff !important;
+  box-shadow:0 0 8px rgba(255,255,255,0.9);
+  transform:scale(1.05);
+  z-index:15;
+}
+.clr.lk{
+  opacity:0.18;
+  cursor:not-allowed;
+  filter:grayscale(1);
+}
+.clr.dark{
+  border:2px solid #888 !important;
+}
+.clr.on.dark{
+  border-color:#fff !important;
+}
+#paltog{
+  width:18px;
+  height:18px;
+  background:#1a1a28;
+  border:1px solid var(--accent);
+  border-radius:3px;
+  cursor:pointer;
+  font-size:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+  color:var(--accent);
+  align-self:flex-start;
+  margin-top:2px;
+}
+
+/* ACTION BUTTONS */
+.abtn{font-family:'Press Start 2P',monospace;font-size:6px;border:2px solid;border-radius:4px;cursor:pointer;padding:4px 6px;line-height:1.6;white-space:nowrap;flex-shrink:0;}
+#pbtn{background:#1a1a28;border-color:var(--accent);color:var(--accent);}
+#pbtn.on{background:var(--accent);color:#000;}
+#dbtn{background:#1a1a28;border-color:var(--blue);color:var(--blue);display:none;}
+#dbtn.on{background:var(--blue);color:#000;}
+#okbtn{background:var(--green);border-color:var(--green);color:#000;display:none;}
+#cancbtn{background:transparent;border-color:var(--red);color:var(--red);display:none;}
+#flagbtn{background:#1a1a28;border-color:#ff9900;color:#ff9900;display:none;}
+#flagbtn.active{background:#ff9900;color:#000;}
+
+/* ICON BUTTONS */
+.ibtn{font-size:15px;background:#1a1a28;border:1px solid var(--border);color:var(--text);padding:3px 7px;border-radius:4px;cursor:pointer;flex-shrink:0;white-space:nowrap;}
+.ibtn:hover,.ibtn.on{border-color:var(--accent);color:var(--accent);}
+#admibtn{border-color:var(--red)!important;color:var(--red)!important;}
+#admibtn.on{background:var(--red);color:#000!important;}
+#actbtn{border-color:#ff9900!important;color:#ff9900!important;}
+#actbtn.on{background:#ff9900;color:#000!important;}
+#sep{width:1px;height:30px;background:var(--border);flex-shrink:0;}
+
+/* PANELS */
+.panel{position:absolute;left:0;right:0;bottom:52px;background:rgba(10,10,20,.98);border-top:2px solid var(--border);z-index:900;display:none;flex-direction:column;height:285px;}
+.panel.open{display:flex;}
+.ptit{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--dim);padding:5px 8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.pcls{cursor:pointer;color:var(--red);font-size:15px;padding:0 4px;}
+.pbody{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px;display:flex;flex-direction:column;gap:5px;}
+
+/* CHAT */
+#ctabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.ctab{flex:1;text-align:center;padding:5px;font-family:'Press Start 2P',monospace;font-size:6px;cursor:pointer;color:var(--dim);background:transparent;border:none;}
+.ctab.on{color:var(--accent);border-bottom:2px solid var(--accent);}
+#cmsgs{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:4px 8px;font-size:13px;display:flex;flex-direction:column;gap:2px;}
+.msys{color:var(--accent);font-size:12px;}
+.musr .nick{color:var(--green);}
+.musr .txt{color:#ccc;}
+#cirow{display:flex;border-top:1px solid var(--border);padding:4px 6px;gap:4px;flex-shrink:0;}
+#cinp{flex:1;background:#1a1a28;border:1px solid var(--border);color:var(--text);font-size:16px;padding:5px 8px;border-radius:5px;outline:none;}
+#cinp:focus{border-color:var(--accent);}
+#csend{background:var(--accent);border:none;color:#000;font-family:'Press Start 2P',monospace;font-size:6px;padding:5px 8px;border-radius:5px;cursor:pointer;}
+
+/* SHOP/CLAN/ADMIN */
+.sect{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);padding:3px 0 2px;}
+.sitem{background:#1a1a28;border:1px solid var(--border);border-radius:5px;padding:6px 8px;display:flex;justify-content:space-between;align-items:center;font-size:13px;gap:5px;}
+.si{flex:1;}
+.si small{color:var(--dim);font-size:11px;display:block;}
+.prc{color:var(--accent);font-size:12px;white-space:nowrap;}
+.sale-badge{color:var(--green);font-size:9px;font-family:'Press Start 2P',monospace;margin-left:3px;display:none;}
+.sale-badge.show{display:inline;}
+.bb{background:var(--accent);border:none;color:#000;font-family:'Press Start 2P',monospace;font-size:5px;padding:4px 6px;border-radius:3px;cursor:pointer;}
+.rb{background:var(--red);border:none;color:#fff;font-family:'Press Start 2P',monospace;font-size:5px;padding:4px 6px;border-radius:3px;cursor:pointer;}
+.blb{background:var(--blue);border:none;color:#000;font-family:'Press Start 2P',monospace;font-size:5px;padding:4px 6px;border-radius:3px;cursor:pointer;}
+.crow{background:#1a1a28;border:1px solid var(--border);border-radius:5px;padding:5px 8px;display:flex;justify-content:space-between;align-items:center;font-size:13px;gap:5px;}
+.ctg{font-family:'Press Start 2P',monospace;font-size:6px;padding:2px 4px;border-radius:3px;margin-right:3px;}
+.jb{background:var(--blue);border:none;color:#000;font-family:'Press Start 2P',monospace;font-size:5px;padding:4px 6px;border-radius:3px;cursor:pointer;}
+.cbtn{background:#1a1a28;border:1px solid var(--accent);color:var(--accent);font-family:'Press Start 2P',monospace;font-size:6px;padding:7px;border-radius:5px;cursor:pointer;width:100%;}
+.arow{background:#1a1a28;border:1px solid #ff6b6b33;border-radius:5px;padding:6px;display:flex;flex-direction:column;gap:4px;}
+.arow label{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--red);}
+.ai{background:#0a0a0f;border:1px solid var(--border);color:var(--text);font-size:14px;padding:4px 6px;border-radius:3px;outline:none;width:100%;font-family:'VT323',monospace;}
+.ai:focus{border-color:var(--accent);}
+.odot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:3px;}
+
+/* ACTIVITY/QUEST PANEL */
+#actpanel{height:330px;}
+
+/* АНИМАЦИЯ ОГНЯ */
+@keyframes fire-flicker {
+  0% { text-shadow: 0 0 3px #ff4400, 0 0 8px #ff6600; transform: scale(1); }
+  25% { text-shadow: 0 0 5px #ff6600, 0 0 12px #ff9900; transform: scale(1.05); }
+  50% { text-shadow: 0 0 3px #ff4400, 0 0 10px #ff8800; transform: scale(1); }
+  75% { text-shadow: 0 0 6px #ff5500, 0 0 14px #ffaa00; transform: scale(1.08); }
+  100% { text-shadow: 0 0 3px #ff4400, 0 0 8px #ff6600; transform: scale(1); }
+}
+.streak-fire {
+  font-size: 36px;
+  display: inline-block;
+  animation: fire-flicker 0.6s infinite ease-in-out;
+  filter: drop-shadow(0 0 6px #ff6600);
+}
+.streak-fire.gray {
+  animation: none;
+  filter: grayscale(1) brightness(0.5);
+  text-shadow: none;
+  opacity: 0.5;
+}
+.streak-num {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  color: #ff9900;
+  text-shadow: 0 0 8px #ff6600;
+}
+.streak-num.gray {
+  color: #666;
+  text-shadow: none;
+}
+.streak-box {
+  background: #1a1a28;
+  border: 2px solid #ff9900;
+  border-radius: 10px;
+  padding: 12px 15px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+.streak-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  color: #888;
+}
+.quest-card {
+  background: #1a1a28;
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.quest-card.done {
+  border-color: var(--green);
+}
+.quest-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  color: var(--accent);
+}
+.quest-desc {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+}
+.quest-progress {
+  height: 8px;
+  background: #222;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.quest-fill {
+  height: 100%;
+  background: var(--green);
+  transition: width 0.4s;
+}
+.flag-info {
+  background: #1a1a28;
+  border: 2px solid #ff9900;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* ПЛАВАЮЩАЯ КНОПКА АКТИВНОСТЕЙ */
+#activityfloatbtn {
+  transition: all 0.2s;
+}
+#activityfloatbtn:hover {
+  background: #ff9900 !important;
+  color: #000 !important;
+  box-shadow: 0 0 20px #ff9900;
+}
+
+
+/* NOTIFY/TOOLTIP */
+#notify{position:fixed;top:12%;left:50%;transform:translateX(-50%);background:var(--accent);color:#000;font-family:'Press Start 2P',monospace;font-size:8px;padding:10px 16px;border-radius:7px;z-index:9998;display:none;text-align:center;line-height:2;box-shadow:0 0 28px var(--accent);max-width:85vw;word-break:break-word;}
+#tip{position:absolute;background:rgba(10,10,20,.96);border:1px solid var(--accent);padding:2px 7px;font-size:12px;pointer-events:none;display:none;z-index:999;border-radius:3px;color:var(--accent);white-space:nowrap;}
+
+</style>
+</head>
+<body>
+
+<!-- MAINTENANCE -->
+<div id="maint">
+  <div class="mtext">⚙️ PIXEL BATTLE<br><br>ТЕХНИЧЕСКИЕ РАБОТЫ</div>
+  <div class="mspin"></div>
+  <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--dim);text-align:center;">Скоро вернёмся!</div>
+</div>
+
+<!-- BROADCAST -->
+<div id="bcast" onclick="this.style.display='none'"><span id="btxt"></span> · нажми закрыть</div>
+
+<!-- WIPE TIMER -->
+<div id="wipetimer">⏳ ДО ВАЙПА<br><span id="wipetime">--:--:--</span></div>
+<div id="onlinecounter"><span>🟢</span> <span id="onlinecount">0</span> онлайн</div>
+<div id="offlinebadge">⚡ ОФЛАЙН БУСТ<br><span id="offlinetime">--:--</span></div>
+
+<!-- ACTIVITY FLOAT BUTTON -->
+<div id="activityfloatbtn" onclick="togglePanel('actpanel','activityfloatbtn');loadActivityPanel();" style="position:fixed;bottom:120px;right:16px;background:rgba(10,10,20,.95);border:2px solid #ff9900;border-radius:8px;padding:8px 12px;font-family:'Press Start 2P',monospace;font-size:7px;color:#ff9900;z-index:2500;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 0 15px rgba(255,153,0,0.3);">
+  🎯 АКТИВНОСТИ
+</div>
+
+<!-- LOGIN -->
+<div id="lscreen">
+  <div class="lbox">
+    <div class="llogo">💡 PIXEL<br>BATTLE v1.2</div>
+    <input class="inp" id="ln" placeholder="Ник" maxlength="16" type="text" autocomplete="off"/>
+    <input class="inp" id="lp" placeholder="Пароль" maxlength="32" type="password"/>
+    <button class="lbtn" onclick="doLogin()">ВОЙТИ / РЕГИСТРАЦИЯ</button>
+    <div id="lerr"></div>
+    <div class="lhint">Новый ник = новый аккаунт</div>
+  </div>
+</div>
+
+<!-- UPDATE PANEL -->
+<div id="updatepanel" style="position:fixed;inset:0;background:#0a0a0f;z-index:10001;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#12121a;border:3px solid #f5c542;border-radius:16px;padding:25px;max-width:500px;width:90%;text-align:center;">
+    <div style="font-family:'Press Start 2P',monospace;font-size:14px;color:#f5c542;margin-bottom:15px;">💡 PIXEL BATTLE</div>
+    <div id="updateVersion" style="font-family:'Press Start 2P',monospace;font-size:10px;color:#4ade80;margin-bottom:20px;">v1.2</div>
+    <div id="updateTitle" style="font-family:'Press Start 2P',monospace;font-size:8px;color:#fff;margin-bottom:15px;line-height:2;">ОБНОВЛЕНИЕ</div>
+    <div id="updateText" style="background:#1a1a28;border:1px solid #2a2a3a;border-radius:8px;padding:15px;font-size:14px;color:#e0e0f0;line-height:1.8;max-height:300px;overflow-y:auto;white-space:pre-wrap;text-align:left;margin-bottom:20px;">Загрузка...</div>
+    <div style="font-size:12px;color:#888;margin-bottom:20px;">Хорошей игры!<br>rtyrt123e@gmail.com</div>
+    <button onclick="closeUpdatePanel()" style="background:#f5c542;border:none;color:#000;font-family:'Press Start 2P',monospace;font-size:8px;padding:12px 25px;border-radius:6px;cursor:pointer;width:100%;">ПРОДОЛЖИТЬ</button>
+  </div>
+</div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo">💡PB v1.2</div>
+  <div class="st"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;"></span>&nbsp;<span class="v" id="sn">—</span></div>
+  <div class="st">Ур.<span class="v" id="sl">1</span></div>
+  <div class="st">💡<span class="v" id="sb">0</span></div>
+  <div class="st">🎨<span class="v" id="si">15</span>/<span class="v" id="sm">15</span><div id="rbar"><div id="rfill"></div></div></div>
+  <div class="st">XP<span class="v" id="sx">0</span>/<span id="sxm">100</span></div>
+  <div id="mbtn" onclick="toggleMusic()"><span id="mico">🎵</span><span style="font-size:11px;color:var(--dim);">S26</span></div>
+  <div onclick="logout()" style="margin-left:auto;cursor:pointer;font-size:14px;padding:0 6px;flex-shrink:0;">🚪</div>
+</div>
+
+<!-- MAP -->
+<div id="map"><div id="zhint">🔍 Приблизь карту<br>чтобы рисовать!</div></div>
+<div id="tip"></div>
+
+<!-- AUDIO -->
+<audio id="bgm" loop preload="none"><source src="music.mp3" type="audio/mpeg"/></audio>
+
+<!-- CHAT -->
+<div class="panel" id="cpanel">
+  <div id="ctabs">
+    <button class="ctab on" id="tg" onclick="swtab('g')">🌍 ГЛОБАЛЬНЫЙ</button>
+    <button class="ctab" id="tc" onclick="swtab('c')">⚔️ КЛАН</button>
+  </div>
+  <div id="cmsgs"></div>
+  <div id="cirow">
+    <input id="cinp" placeholder="Нажми чтобы писать..." maxlength="120" type="text" autocomplete="off"/>
+    <button id="csend" onclick="sendChat()">OK</button>
+  </div>
+</div>
+
+<!-- SHOP -->
+<div class="panel" id="spanel">
+  <div class="ptit">🏪 МАГАЗИН <span class="pcls" onclick="closeAll()">✕</span></div>
+  <div class="pbody">
+    <div class="sect">КРАСКИ</div>
+    <div class="sitem">
+      <div class="si">🎨 +10 красок<small>Мгновенно</small></div>
+      <span class="prc">💡100 <span class="sale-badge" id="sale-ink">СКИДКА</span></span>
+      <button class="bb" onclick="buy('i')">КУПИТЬ</button>
+    </div>
+    <div class="sect">ПРИВАТ</div>
+    <div class="sitem">
+      <div class="si">🔒 15 мин<small>~5км · 3 чел</small></div>
+      <span class="prc" id="pp1">💡500 <span class="sale-badge" id="sale-p1">СКИДКА</span></span>
+      <button class="bb" onclick="buy('p1')">КУПИТЬ</button>
+    </div>
+    <div class="sitem">
+      <div class="si">🔒 30 мин<small>~15км · 7 чел</small></div>
+      <span class="prc" id="pp2">💡1500 <span class="sale-badge" id="sale-p2">СКИДКА</span></span>
+      <button class="bb" onclick="buy('p2')">КУПИТЬ</button>
+    </div>
+    <div class="sect" id="offshop-sect" style="display:none;">⚡ ОФЛАЙН БУСТ <small style="color:var(--dim);font-size:10px;">(с 3 уровня)</small></div>
+    <div class="sitem" id="offshop-30" style="display:none;">
+      <div class="si">⚡ 30 минут офлайн<small>Краска копится 30 мин</small></div>
+      <span class="prc" id="off1p">💡500 <span class="sale-badge" id="sale-off1">СКИДКА</span></span>
+      <button class="bb" onclick="buy('off30')">КУПИТЬ</button>
+    </div>
+    <div class="sitem" id="offshop-60" style="display:none;">
+      <div class="si">⚡ 1 час офлайн<small>Краска копится 1 час</small></div>
+      <span class="prc" id="off2p">💡1000 <span class="sale-badge" id="sale-off2">СКИДКА</span></span>
+      <button class="bb" onclick="buy('off60')">КУПИТЬ</button>
+    </div>
+    <div class="sitem" id="offshop-120" style="display:none;">
+      <div class="si">⚡ 2 часа офлайн<small>Краска копится 2 часа</small></div>
+      <span class="prc" id="off3p">💡1500 <span class="sale-badge" id="sale-off3">СКИДКА</span></span>
+      <button class="bb" onclick="buy('off120')">КУПИТЬ</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLAN -->
+<div class="panel" id="clpanel">
+  <div class="ptit">👥 КЛАНЫ <span class="pcls" onclick="closeAll()">✕</span></div>
+  <div class="pbody" id="clinner"></div>
+</div>
+
+<!-- ACTIVITY PANEL -->
+<div class="panel" id="actpanel">
+  <div class="ptit">🎯 АКТИВНОСТИ <span class="pcls" onclick="closeAll()">✕</span></div>
+  <div class="pbody" id="actbody">
+    <div style="color:var(--dim);font-size:13px;text-align:center;padding:10px;">Загрузка...</div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div class="panel" id="admpanel" style="height:420px;">
+  <div class="ptit" style="color:var(--red);">👑 АДМИН-ПАНЕЛЬ <span class="pcls" onclick="closeAll()">✕</span></div>
+  <div class="pbody" id="admbody">
+    <div style="color:var(--dim);font-size:13px;text-align:center;padding:10px;">Введи пароль администратора</div>
+    <div style="display:flex;flex-direction:column;gap:6px;padding:4px;">
+      <input class="ai" id="adm-pass-inp" placeholder="Пароль админа" type="password"/>
+      <button class="bb" onclick="unlockAdmin()" style="font-size:7px;padding:8px;">ВОЙТИ КАК АДМИН</button>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM BAR -->
+<div id="bottombar">
+  <div id="palwrap">
+    <div id="palette"></div>
+    <div id="paltog" onclick="togglePal()">▼</div>
+  </div>
+  <div id="sep"></div>
+  <button class="abtn" id="pbtn" onclick="togglePaint()">PAINT<br><span id="pctr">15/15</span></button>
+  <button class="abtn" id="dbtn" onclick="toggleDrag()">🔒DRAG</button>
+  <button class="abtn" id="flagbtn" onclick="toggleFlagMode()">🚩FLAG</button>
+  <button class="abtn" id="okbtn" onclick="confirmPx()">✓ОК</button>
+  <button class="abtn" id="cancbtn" onclick="cancelPx()">✗</button>
+  <div style="width:1px;height:30px;background:var(--border);flex-shrink:0;"></div>
+  <button class="ibtn" id="chatbtn" onclick="togglePanel('cpanel','chatbtn')">💬</button>
+  <button class="ibtn" id="clanbtn" onclick="togglePanel('clpanel','clanbtn');loadClan()">👥</button>
+  <button class="ibtn" id="shopbtn" onclick="togglePanel('spanel','shopbtn');renderShop()">🏪</button>
+  <button class="ibtn" id="admibtn" onclick="togglePanel('admpanel','admibtn');loadAdminPanel()">👑</button>
+</div>
+
+<div id="notify"></div>
+
+<script>
+const ADMIN_NICK='qwe', ADMIN_PASS='123456wwe';
+firebase.initializeApp({databaseURL:"https://pixel-battle-fb897-default-rtdb.firebaseio.com"});
+const db=firebase.database();
+
+const COLORS=[
+  '#ff0000','#ff8800','#ffff00','#00cc00','#00cccc','#0000ff','#cc00cc','#ffffff',
+  '#ff6666','#ffaa44','#aaff44','#44ffcc','#44aaff','#aa44ff','#ff44aa','#aaaaaa',
+  '#880000','#884400','#448800','#006644','#004488','#440088','#880044','#444444',
+  '#ffcccc','#ffeecc','#ccffcc','#ccffee','#cceeff','#eeccff','#ffccee','#111111',
+  '#ff3300','#ff6600','#ff9900','#ffcc00','#ccff00','#99ff00','#00ff66','#00ffcc',
+  '#00ffff','#00ccff','#0099ff','#0066ff','#3300ff','#6600ff','#9900ff','#cc00ff',
+  '#ff00cc','#ff0066','#990000','#994400','#999900','#009900','#009999','#000099',
+  '#990099','#664422','#446622','#224466','#662244','#ffddbb','#bbffdd','#bbddff',
+  '#222222','#555555','#777777','#999999','#bbbbbb','#dddddd','#ff8866','#66ff88',
+  '#8866ff','#ff6688','#ffaa88','#88ffaa','#aa88ff','#ffaa00','#00ffaa','#aa00ff',
+  '#dd2200','#00dd22','#2200dd','#ddaa00','#00ddaa','#aa00dd','#552200','#005522',
+  '#220055','#225500','#002255','#554400','#005544','#440055','#ff77aa','#77ffaa',
+  '#aa77ff','#ffaa77','#aaffaa','#aaaaff','#ffaaaa','#aaffff','#ffeeaa','#aaffee',
+  '#bb5500','#00bb55','#5500bb','#bb0055','#55bb00','#0055bb','#bbaa00','#00bbaa',
+  '#aa00bb','#bb00aa','#aabb00','#00aabb','#331100','#003311','#110033','#330011'
+];
+
+// XP нужно для следующего уровня (v1.2: уровни до 15)
+function xpNeeded(lvl){
+  if(lvl<=3)return 100;
+  if(lvl<=5)return 250;
+  if(lvl<=10)return 300;
+  return 400; // 10-15
+}
+
+// Сколько цветов открыто на уровне
+function colorsForLevel(lvl){
+  if(lvl>=15)return COLORS.length; // 128
+  if(lvl>=14)return 64;
+  // до 14 уровня — базовые 8 + 1 каждый уровень начиная с 1
+  return Math.min(8+(lvl-1), 64);
+}
+
+// Время флага по уровню
+function flagDuration(lvl){
+  if(lvl>=11)return 3*60*60*1000;
+  if(lvl>=8)return 2*60*60*1000;
+  if(lvl>=6)return 60*60*1000;
+  return 30*60*1000; // уровень 5
+}
+
+let bannedPlayers={};
+let P=null,pm=false,dm=false,flagMode=false,drag=false,ghosts=[],col='#ff0000';
+let privBuys=[0,0],rp=0,ctab='g',palExp=false,isAdmin=false;
+const pxL={},pxD={},pvL=[];let pvZ=[];
+let heatmapActive=false,heatmapMarkers=[],wipeInterval=null;
+let dthrot=0,lastDragPos=null;
+let activeSale={};
+let offlineBstInterval=null;
+const flagMarkers=[];
+
+// ══ MUSIC ══
+let mplay=false;
+const bgm=document.getElementById('bgm');
+function toggleMusic(){
+  if(mplay){bgm.pause();mplay=false;document.getElementById('mico').textContent='🎵';}
+  else{bgm.play().then(()=>{mplay=true;document.getElementById('mico').textContent='⏸️';}).catch(()=>notify('Нажми ещё раз!'));}
+}
+
+// ══ SESSION ══
+function saveSession(nick,pass){
+  localStorage.setItem('pixelBattleSession',JSON.stringify({nick,pass,expires:Date.now()+7*24*60*60*1000}));
+}
+function loadSession(){
+  try{const d=localStorage.getItem('pixelBattleSession');if(!d)return null;const s=JSON.parse(d);if(Date.now()>s.expires){localStorage.removeItem('pixelBattleSession');return null;}return s;}catch(e){return null;}
+}
+function clearSession(){localStorage.removeItem('pixelBattleSession');}
+async function autoLogin(){
+  const s=loadSession();if(!s)return;
+  document.getElementById('ln').value=s.nick;
+  document.getElementById('lp').value=s.pass;
+  await doLogin(true);
+}
+function logout(){
+  clearSession();P=null;
+  document.getElementById('lscreen').style.display='flex';
+  document.getElementById('ln').value='';document.getElementById('lp').value='';
+  ghosts.forEach(g=>map.removeLayer(g.r));ghosts=[];closeAll();notify('👋 Вы вышли из аккаунта');
+}
+
+// ══ PALETTE — сетка ══
+function togglePal(){
+  palExp=!palExp;
+  document.getElementById('palette').classList.toggle('exp',palExp);
+  document.getElementById('paltog').textContent=palExp?'▲':'▼';
+}
+function buildPal(){
+  const pal=document.getElementById('palette');pal.innerHTML='';
+  const ul=P.colors.length;
+  const show=Math.min(ul+2,COLORS.length);
+  COLORS.slice(0,show).forEach((c,i)=>{
+    const b=document.createElement('div');
+    const lk=i>=ul;
+    // Тёмные цвета — ставим специальную рамку чтобы было видно
+    const dark=['#111111','#222222','#333333','#000000','#444444','#0a0a0f','#111111'].includes(c)||
+                (parseInt(c.substring(1,3),16)+parseInt(c.substring(3,5),16)+parseInt(c.substring(5,7),16))<60;
+    b.className='clr'+(lk?' lk':'')+(c===col&&!lk?' on':'')+(dark?' dark':'');
+    b.style.background=c;
+    b.title=lk?'🔒 Открывается позже':c;
+    if(!lk)b.onclick=()=>{col=c;buildPal();};
+    pal.appendChild(b);
+  });
+}
+
+// ══ LOGIN ══
+function lerr(m){document.getElementById('lerr').textContent=m;}
+async function doLogin(isAuto=false){
+  const nick=document.getElementById('ln').value.trim();
+  const pass=document.getElementById('lp').value.trim();
+  if(!nick||!pass){if(!isAuto)lerr('Введи ник и пароль!');return;}
+  if(nick.length<2){if(!isAuto)lerr('Ник мин. 2 символа!');return;}
+  if(/[.#$\/\[\]]/.test(nick)){if(!isAuto)lerr('Недопустимые символы!');return;}
+  const banSnap=await db.ref('banned/'+nick).once('value');
+  if(banSnap.exists()){
+    const b=banSnap.val();
+    if(b.expires>Date.now()){lerr('⛔ Забанен до '+new Date(b.expires).toLocaleString());return;}
+    else await db.ref('banned/'+nick).remove();
+  }
+  const ref=db.ref('players/'+nick);
+  const snap=await ref.once('value');
+  if(snap.exists()){
+    const d=snap.val();
+    if(d.pass!==pass){if(!isAuto)lerr('Неверный пароль!');clearSession();return;}
+    P=d;
+    if(P.lastSave){const aw=Math.floor((Date.now()-P.lastSave)/1000);P.ink=Math.min(P.inkMax,P.ink+Math.floor(aw/30));}
+  } else {
+    P={nick,pass,level:1,xp:0,ink:15,inkMax:15,bulbs:0,
+       colors:COLORS.slice(0,8),privBuys:[0,0],privCosts:[500,1500],
+       offCosts:[500,1000,1500],clan:'',lastSave:Date.now(),
+       streak:0,lastQuestDate:'',questDone:false,flagAvailable:false,flagLastGiven:0};
+    await ref.set(P);
+    pChat(null,'🆕 '+nick+' вошёл в игру!','sys','');
+    const vSnap=await db.ref('config/version').once('value');
+    if(!vSnap.exists())await db.ref('config/version').set('1.2');
+  }
+  // Ensure new fields exist for old players
+  if(!P.offCosts)P.offCosts=[500,1000,1500];
+  if(!P.streak)P.streak=0;
+  if(P.lastQuestDate===undefined)P.lastQuestDate='';
+  if(P.questDone===undefined)P.questDone=false;
+  if(P.flagAvailable===undefined)P.flagAvailable=false;
+  if(!P.flagLastGiven)P.flagLastGiven=0;
+
+  saveSession(nick,pass);
+  privBuys=P.privBuys||[0,0];
+  isAdmin=(nick===ADMIN_NICK&&pass===ADMIN_PASS);
+  document.getElementById('lscreen').style.display='none';
+  setTimeout(()=>checkUpdatePanel(),500);
+  initUI();startRestore();listenPx();listenChat();listenPv();
+  listenMaint();listenBcast();listenBans();listenVersion();listenSale();listenFlags();
+  pingOnline();setInterval(pingOnline,25000);
+  startWipeTimer();
+  updateOnlineCounter();setInterval(updateOnlineCounter,30000);
+  checkDailyQuest();
+  checkOfflineBoost();
+}
+function saveP(){
+  if(!P)return;P.lastSave=Date.now();
+  db.ref('players/'+P.nick).update({
+    level:P.level,xp:P.xp,ink:P.ink,inkMax:P.inkMax,bulbs:P.bulbs,
+    colors:P.colors,privBuys,privCosts:P.privCosts||[500,1500],
+    offCosts:P.offCosts||[500,1000,1500],clan:P.clan||'',lastSave:P.lastSave,
+    streak:P.streak||0,lastQuestDate:P.lastQuestDate||'',
+    questDone:P.questDone||false,flagAvailable:P.flagAvailable||false,
+    flagLastGiven:P.flagLastGiven||0
+  });
+}
+function pingOnline(){
+  if(!P)return;
+  const r=db.ref('online/'+P.nick);
+  r.set({nick:P.nick,t:Date.now(),clan:P.clan||'',lat:map.getCenter().lat,lng:map.getCenter().lng});
+  r.onDisconnect().remove();
+}
+
+// ══ UI ══
+function initUI(){updS();buildPal();renderShop();}
+function updS(){
+  if(!P)return;
+  const tag=P.clan?'['+P.clan+'] ':'';
+  document.getElementById('sn').textContent=tag+P.nick;
+  document.getElementById('sl').textContent=P.level;
+  document.getElementById('sb').textContent=P.bulbs;
+  document.getElementById('si').textContent=P.ink;
+  document.getElementById('sm').textContent=P.inkMax;
+  document.getElementById('pctr').textContent=P.ink+'/'+P.inkMax;
+  document.getElementById('sx').textContent=P.xp;
+  document.getElementById('sxm').textContent=xpNeeded(P.level);
+  const c=P.privCosts||[500,1500];
+  document.getElementById('pp1').textContent='💡'+c[0];
+  document.getElementById('pp2').textContent='💡'+c[1];
+  // Флаг — показываем кнопку с 5 уровня
+  document.getElementById('flagbtn').style.display=P.level>=5?'inline-block':'none';
+  if(P.flagAvailable) document.getElementById('flagbtn').classList.add('active');
+  else document.getElementById('flagbtn').classList.remove('active');
+}
+
+// ══ MAP ══
+const MZ=7;
+const map=L.map('map',{center:[30,20],zoom:3,zoomControl:true,attributionControl:false,doubleClickZoom:false,maxBounds:[[-85,-200],[85,200]],maxBoundsViscosity:0.9,tap:true});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19,minZoom:2,opacity:0.92}).addTo(map);
+
+const CELL_SIZE=0.00025;
+function pd(){return{la:CELL_SIZE,ln:CELL_SIZE};}
+function snap(ll){return{lat:Math.round(ll.lat/CELL_SIZE)*CELL_SIZE,lng:Math.round(ll.lng/CELL_SIZE)*CELL_SIZE};}
+function pk(lat,lng){return(lat>=0?'N':'S')+Math.abs(lat).toFixed(5).replace('.','x')+'_'+(lng>=0?'E':'W')+Math.abs(lng).toFixed(5).replace('.','x');}
+function chkZ(){document.getElementById('zhint').style.display=map.getZoom()<MZ?'block':'none';}
+map.on('zoomend',chkZ);chkZ();
+
+// ══ PAINT ══
+map.on('click',function(e){
+  if(flagMode){placeFlag(e.latlng);return;}
+  if(!pm||dm)return;
+  placeG(e.latlng);
+});
+function placeG(ll){
+  if(map.getZoom()<MZ){notify('🔍 Приблизь карту!');return;}
+  const sn=snap(ll);const k=pk(sn.lat,sn.lng);
+  const ei=ghosts.findIndex(g=>g.k===k);
+  if(ei!==-1){map.removeLayer(ghosts[ei].r);ghosts[ei]={k,lat:sn.lat,lng:sn.lng,color:col,r:mkGR(sn)};return;}
+  if(pxD[k]){
+    if(pxD[k].nick===P.nick&&pxD[k].color===col){notify('⚠️ У вас уже стоит такой цвет!');return;}
+  }
+  if(P.ink<=0){notify('❌ Нет красок!');return;}
+  P.ink--;ghosts.push({k,lat:sn.lat,lng:sn.lng,color:col,r:mkGR(sn)});updS();
+}
+function mkGR(sn){
+  const s=pd();
+  return L.rectangle([[sn.lat-s.la/2,sn.lng-s.ln/2],[sn.lat+s.la/2,sn.lng+s.ln/2]],
+    {color:col,fillColor:col,fillOpacity:0.42,weight:1,opacity:0.6,dashArray:'4,3'}).addTo(map);
+}
+
+// ══ DRAG ══
+map.on('mousedown',e=>{if(pm&&dm){drag=true;lastDragPos=snap(e.latlng);placeG(e.latlng);}});
+map.on('mousemove',e=>{
+  if(!drag||!pm||!dm)return;
+  const n=Date.now();if(n-dthrot<50)return;dthrot=n;
+  const cs=snap(e.latlng);
+  if(lastDragPos&&lastDragPos.lat===cs.lat&&lastDragPos.lng===cs.lng)return;
+  lastDragPos=cs;placeG(e.latlng);
+});
+map.on('mouseup',()=>{drag=false;lastDragPos=null;});
+const mc=map.getContainer();
+mc.addEventListener('touchstart',e=>{
+  if(flagMode){
+    const t=e.touches[0];const tb=document.getElementById('topbar').offsetHeight;
+    placeFlag(map.containerPointToLatLng(L.point(t.clientX,t.clientY-tb)));return;
+  }
+  if(!pm||!dm)return;drag=true;
+  const t=e.touches[0];const tb=document.getElementById('topbar').offsetHeight;
+  const ll=map.containerPointToLatLng(L.point(t.clientX,t.clientY-tb));
+  lastDragPos=snap(ll);placeG(ll);
+},{passive:true});
+mc.addEventListener('touchmove',e=>{
+  if(!drag||!pm||!dm)return;
+  const n=Date.now();if(n-dthrot<80)return;dthrot=n;
+  const t=e.touches[0];const tb=document.getElementById('topbar').offsetHeight;
+  const ll=map.containerPointToLatLng(L.point(t.clientX,t.clientY-tb));
+  const cs=snap(ll);
+  if(lastDragPos&&lastDragPos.lat===cs.lat&&lastDragPos.lng===cs.lng)return;
+  lastDragPos=cs;placeG(ll);
+},{passive:true});
+mc.addEventListener('touchend',()=>{drag=false;lastDragPos=null;},{passive:true});
+
+function togglePaint(){
+  if(!P)return;pm=!pm;
+  if(!pm){dm=false;document.getElementById('dbtn').classList.remove('on');}
+  document.getElementById('pbtn').classList.toggle('on',pm);
+  document.getElementById('dbtn').style.display=pm?'inline-block':'none';
+  document.getElementById('okbtn').style.display=pm?'inline-block':'none';
+  document.getElementById('cancbtn').style.display=pm?'inline-block':'none';
+  if(pm){map.dragging.disable();map.scrollWheelZoom.disable();}
+  else{map.dragging.enable();map.scrollWheelZoom.enable();}
+}
+function toggleDrag(){
+  if(!pm){notify('Сначала включи PAINT!');return;}
+  dm=!dm;document.getElementById('dbtn').classList.toggle('on',dm);
+}
+function confirmPx(){
+  if(!ghosts.length){togglePaint();return;}
+  const up={};let bl=0;
+  ghosts.forEach(g=>{
+    if(isPvBlk(g.lat,g.lng)){bl++;map.removeLayer(g.r);P.ink++;return;}
+    up['pixels/'+g.k]={lat:g.lat,lng:g.lng,color:g.color,nick:P.nick,clan:P.clan||'',t:Date.now()};
+  });
+  if(Object.keys(up).length)db.ref().update(up);
+  const cnt=Object.keys(up).length;
+  if(cnt){
+    const bppTable=[5,5,6,7,7,8,8,9,10,12,13,14,15,16,18];
+    const bpp=bppTable[Math.min(P.level-1,14)]||18;
+    P.bulbs+=cnt*bpp;P.xp+=cnt;
+    chkLvl();
+    pChat(null,P.nick+' +'+cnt+'пкс (+'+cnt*bpp+'💡)','sys','');
+    // Прогресс квеста
+    updateQuestProgress(cnt);
+  }
+  if(bl)notify('❌ '+bl+' заблокировано приватом!');
+  ghosts=[];saveP();updS();dm=false;document.getElementById('dbtn').classList.remove('on');togglePaint();
+}
+function cancelPx(){ghosts.forEach(g=>{map.removeLayer(g.r);P.ink++;});ghosts=[];updS();dm=false;document.getElementById('dbtn').classList.remove('on');togglePaint();}
+
+// ══ PIXELS ══
+function listenPx(){
+  db.ref('pixels').once('value',s=>{const a=s.val()||{};Object.entries(a).forEach(([k,p])=>{pxD[k]=p;if(map.getZoom()>=MZ)drwPx(k,p);});});
+  db.ref('pixels').on('child_added',s=>{const k=s.key,p=s.val();if(!pxD[k]){pxD[k]=p;if(map.getZoom()>=MZ)drwPx(k,p);}});
+  db.ref('pixels').on('child_changed',s=>{const k=s.key,p=s.val();pxD[k]=p;if(map.getZoom()>=MZ)drwPx(k,p);});
+  db.ref('pixels').on('child_removed',s=>{const k=s.key;delete pxD[k];if(pxL[k]){map.removeLayer(pxL[k]);delete pxL[k];}});
+}
+function drwPx(k,p){
+  if(pxL[k])map.removeLayer(pxL[k]);
+  const s=pd();
+  const r=L.rectangle([[p.lat-s.la/2,p.lng-s.ln/2],[p.lat+s.la/2,p.lng+s.ln/2]],
+    {color:p.color,fillColor:p.color,fillOpacity:0.93,weight:0.1}).addTo(map);
+  pxL[k]=r;
+  r.on('click',e=>{if(pm||flagMode)return;tipAt(e.originalEvent.clientX,e.originalEvent.clientY,'👤 '+(p.clan?'['+p.clan+'] ':'')+p.nick);setTimeout(hideTip,2500);});
+}
+map.on('zoomend',()=>{
+  const z=map.getZoom();
+  Object.keys(pxL).forEach(k=>{map.removeLayer(pxL[k]);delete pxL[k];});
+  if(z>=MZ)Object.entries(pxD).forEach(([k,p])=>drwPx(k,p));
+  rdPv();
+});
+
+// ══ LEVEL UP (v1.2: до 15 уровней) ══
+function chkLvl(){
+  const need=xpNeeded(P.level);
+  if(P.xp>=need&&P.level<15){
+    P.xp-=need;P.level++;P.inkMax+=5;P.ink=Math.min(P.ink+2,P.inkMax);
+    const newColors=colorsForLevel(P.level);
+    if(P.colors.length<newColors)P.colors=COLORS.slice(0,newColors);
+    const msg=P.level>=15?'🎨 ВСЕ ЦВЕТА!':P.level>=14?'🎨 64 ЦВЕТА!':'+5 краски +1 цвет';
+    notify('🎉 УР.'+P.level+'!\n'+msg);
+    buildPal();renderShop();chkLvl();
+  }
+}
+
+// ══ RESTORE + ОФЛАЙН БУСТ ══
+function startRestore(){
+  setInterval(()=>{
+    if(!P)return;
+    // Обычное восстановление
+    rp+=100/30;
+    document.getElementById('rfill').style.width=Math.min(rp,100)+'%';
+    if(rp>=100){
+      rp=0;
+      if(P.ink<P.inkMax){
+        P.ink++;
+        // С 3 уровня офлайн начисление (+1 краска в офлайн каждые 30 сек — работает через lastSave при следующем входе)
+        saveP();updS();
+      }
+    }
+  },1000);
+}
+
+// ══ ОФЛАЙН БУСТ ══
+function checkOfflineBoost(){
+  if(!P)return;
+  const boost=P.offlineBoostExpires||0;
+  if(boost>Date.now()){
+    showOfflineBadge(boost);
+  } else {
+    document.getElementById('offlinebadge').style.display='none';
+    if(offlineBstInterval){clearInterval(offlineBstInterval);offlineBstInterval=null;}
+  }
+}
+function showOfflineBadge(expireAt){
+  const badge=document.getElementById('offlinebadge');
+  badge.style.display='flex';
+  if(offlineBstInterval)clearInterval(offlineBstInterval);
+  offlineBstInterval=setInterval(()=>{
+    const diff=expireAt-Date.now();
+    if(diff<=0){badge.style.display='none';clearInterval(offlineBstInterval);return;}
+    const m=Math.floor(diff/60000),s=Math.floor((diff%60000)/1000);
+    document.getElementById('offlinetime').textContent=m+':'+(s<10?'0':'')+s;
+  },1000);
+}
+
+// ══ CHAT ══
+function listenChat(){db.ref('chat').limitToLast(60).on('value',s=>{if(ctab==='g')rndrM(Object.values(s.val()||{}));});}
+function swtab(t){
+  ctab=t;
+  document.getElementById('tg').classList.toggle('on',t==='g');
+  document.getElementById('tc').classList.toggle('on',t==='c');
+  if(t==='g'){db.ref('chat').limitToLast(60).once('value',s=>rndrM(Object.values(s.val()||{})));}
+  else{
+    if(!P||!P.clan){rndrM([{type:'sys',txt:'Ты не в клане!',t:0}]);return;}
+    db.ref('clan_chat/'+P.clan).limitToLast(60).on('value',s=>{if(ctab==='c')rndrM(Object.values(s.val()||{}));});
+  }
+}
+function rndrM(arr){
+  arr.sort((a,b)=>a.t-b.t);
+  const c=document.getElementById('cmsgs');c.innerHTML='';
+  arr.forEach(m=>{
+    const d=document.createElement('div');
+    if(m.type==='sys'){d.className='msys';d.textContent=m.txt;}
+    else{d.className='musr';const tg=m.clan?'<b style="color:var(--blue)">['+m.clan+']</b> ':'';d.innerHTML=tg+'<span class="nick">'+esc(m.nick)+':</span> <span class="txt">'+esc(m.txt)+'</span>';}
+    c.appendChild(d);
+  });
+  c.scrollTop=c.scrollHeight;
+}
+function esc(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function pChat(n,t,type,clan){db.ref('chat').push({nick:n,txt:t,type,clan:clan||'',t:Date.now()});}
+function sendChat(){
+  const inp=document.getElementById('cinp');const t=inp.value.trim();if(!t||!P)return;
+  if(ctab==='g'){pChat(P.nick,t,'usr',P.clan||'');}
+  else{if(!P.clan){notify('Вступи в клан!');return;}db.ref('clan_chat/'+P.clan).push({nick:P.nick,txt:t,type:'usr',clan:P.clan,t:Date.now()});}
+  inp.value='';inp.focus();
+}
+document.getElementById('cinp').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+
+// ══ SHOP ══
+function renderShop(){
+  if(!P)return;
+  // Офлайн буст — показываем с 3 уровня
+  const showOff=P.level>=3;
+  document.getElementById('offshop-sect').style.display=showOff?'':'none';
+  document.getElementById('offshop-30').style.display=showOff?'flex':'none';
+  document.getElementById('offshop-60').style.display=showOff?'flex':'none';
+  document.getElementById('offshop-120').style.display=showOff?'flex':'none';
+  const oc=P.offCosts||[500,1000,1500];
+  document.getElementById('off1p').childNodes[0].textContent='💡'+oc[0]+' ';
+  document.getElementById('off2p').childNodes[0].textContent='💡'+oc[1]+' ';
+  document.getElementById('off3p').childNodes[0].textContent='💡'+oc[2]+' ';
+  const c=P.privCosts||[500,1500];
+  document.getElementById('pp1').childNodes[0].textContent='💡'+c[0]+' ';
+  document.getElementById('pp2').childNodes[0].textContent='💡'+c[1]+' ';
+  updateSaleBadges();
+}
+function updateSaleBadges(){
+  const ids=['sale-ink','sale-p1','sale-p2','sale-off1','sale-off2','sale-off3'];
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.classList.toggle('show',!!(activeSale.active));
+  });
+}
+
+function buy(type){
+  if(!P)return;
+  const c=P.privCosts||[500,1500];
+  const oc=P.offCosts||[500,1000,1500];
+  const disc=activeSale.active?activeSale.discount||0:0;
+  const discounted=(price)=>Math.max(1,Math.round(price*(1-disc/100)));
+
+  if(type==='i'){
+    const cost=discounted(100);
+    if(P.bulbs<cost){notify('Нужно 💡'+cost+'!');return;}
+    P.bulbs-=cost;P.ink=Math.min(P.ink+10,P.inkMax);notify('🎨 +10 красок!');
+  } else if(type==='p1'){
+    const cost=discounted(c[0]);
+    if(P.bulbs<cost){notify('Нужно 💡'+cost+'!');return;}
+    P.bulbs-=cost;privBuys[0]++;
+    if(Math.random()<0.75)c[0]+=150;
+    P.privCosts=c;P.privBuys=privBuys;actPv(900,5000);notify('🔒 Приват 15 мин (5 км)!');
+  } else if(type==='p2'){
+    const cost=discounted(c[1]);
+    if(P.bulbs<cost){notify('Нужно 💡'+cost+'!');return;}
+    P.bulbs-=cost;privBuys[1]++;
+    if(Math.random()<0.75)c[1]+=150;
+    P.privCosts=c;P.privBuys=privBuys;actPv(1800,15000);notify('🔒 Приват 30 мин (15 км)!');
+  } else if(type==='off30'){
+    if(P.level<3){notify('🔒 С 3 уровня!');return;}
+    const cost=discounted(oc[0]);
+    if(P.bulbs<cost){notify('Нужно 💡'+cost+'!');return;}
+    P.bulbs-=cost;
+    if(Math.random()<0.6)oc[0]+=150;
+    P.offCosts=oc;
+    activateOfflineBoost(30*60*1000);notify('⚡ Офлайн буст 30 мин активирован!');
+  } else if(type==='off60'){
+    if(P.level<3){notify('🔒 С 3 уровня!');return;}
+    const cost=discounted(oc[1]);
+    if(P.bulbs<cost){notify('Нужно 💡'+cost+'!');return;}
+    P.bulbs-=cost;
+    if(Math.random()<0.6)oc[1]+=150;
+    P.offCosts=oc;
+    activateOfflineBoost(60*60*1000);notify('⚡ Офлайн буст 1 час активирован!');
+  } else if(type==='off120'){
+    if(P.level<3){notify('🔒 С 3 уровня!');return;}
+    const cost=discounted(oc[2]);
+    if(P.bulbs<cost){notify('Нужно 💡'+cost+'!');return;}
+    P.bulbs-=cost;
+    if(Math.random()<0.6)oc[2]+=150;
+    P.offCosts=oc;
+    activateOfflineBoost(120*60*1000);notify('⚡ Офлайн буст 2 часа активирован!');
+  }
+  saveP();updS();renderShop();
+}
+
+function activateOfflineBoost(durationMs){
+  const expAt=Date.now()+durationMs;
+  P.offlineBoostExpires=expAt;
+  showOfflineBadge(expAt);
+}
+
+// ══ SALE SYSTEM ══
+function listenSale(){
+  db.ref('config/sale').on('value',s=>{
+    activeSale=s.val()||{};
+    updateSaleBadges();
+    renderShop();
+  });
+}
+
+// ══ PRIVET ══
+function actPv(sec,rm){const c=map.getCenter();db.ref('privet').push({nick:P.nick,clan:P.clan||'',lat:c.lat,lng:c.lng,radiusM:rm,expireAt:Date.now()+sec*1000,t:Date.now()});}
+function listenPv(){
+  db.ref('privet').on('value',s=>{
+    const a=s.val()||{};pvZ=[];const now=Date.now();
+    Object.entries(a).forEach(([k,z])=>{if(z.expireAt<now){db.ref('privet/'+k).remove();return;}pvZ.push({...z,radiusM:z.radiusM||5000});});
+    rdPv();
+  });
+}
+function rdPv(){
+  pvL.forEach(l=>map.removeLayer(l));pvL.length=0;
+  const now=Date.now();
+  pvZ.forEach(z=>{
+    if(z.expireAt<now)return;
+    const mins=Math.ceil((z.expireAt-now)/60000);
+    const c=L.circle([z.lat,z.lng],{radius:z.radiusM,color:'#f5c542',fillColor:'#f5c542',fillOpacity:0.06,weight:2,dashArray:'8,5',opacity:0.8}).addTo(map);
+    c.bindTooltip('🔒 '+(z.clan?'['+z.clan+'] ':'')+z.nick+' · '+mins+'мин',{permanent:false,direction:'center'});
+    pvL.push(c);
+  });
+}
+function isPvBlk(lat,lng){
+  const now=Date.now();
+  for(const z of pvZ){
+    if(z.expireAt<now)continue;if(P.clan&&z.clan&&P.clan===z.clan)continue;if(z.nick===P.nick)continue;
+    const R=6371000,dLa=(lat-z.lat)*Math.PI/180,dLn=(lng-z.lng)*Math.PI/180;
+    const a=Math.sin(dLa/2)**2+Math.cos(z.lat*Math.PI/180)*Math.cos(lat*Math.PI/180)*Math.sin(dLn/2)**2;
+    if(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))<z.radiusM)return true;
+  }
+  return false;
+}
+
+// ══ FLAG SYSTEM (с 5 уровня) ══
+let flagModeActive=false;
+function toggleFlagMode(){
+  if(!P){return;}
+  if(P.level<5){notify('🔒 Флаг открывается на 5 уровне!');return;}
+  if(!P.flagAvailable){notify('🚩 Флаг недоступен. Следующий даётся завтра!');return;}
+  flagMode=!flagMode;
+  document.getElementById('flagbtn').classList.toggle('active',flagMode);
+  if(flagMode){
+    map.dragging.disable();map.scrollWheelZoom.disable();
+    notify('🚩 Тапни на карту чтобы поставить флаг!');
+  } else {
+    map.dragging.enable();map.scrollWheelZoom.enable();
+  }
+}
+function placeFlag(latlng){
+  if(!P||!flagMode||!P.flagAvailable)return;
+  const dur=flagDuration(P.level);
+  const expAt=Date.now()+dur;
+  const mins=Math.round(dur/60000);
+  db.ref('flags').push({nick:P.nick,clan:P.clan||'',lat:latlng.lat,lng:latlng.lng,expireAt:expAt,t:Date.now()});
+  P.flagAvailable=false;
+  saveP();updS();
+  flagMode=false;
+  document.getElementById('flagbtn').classList.remove('active');
+  map.dragging.enable();map.scrollWheelZoom.enable();
+  pChat(null,'🚩 '+P.nick+' поставил флаг активности на '+mins+' мин!','sys','');
+  notify('🚩 Флаг поставлен на '+mins+' минут!');
+}
+function listenFlags(){
+  db.ref('flags').on('value',s=>{
+    flagMarkers.forEach(m=>map.removeLayer(m));flagMarkers.length=0;
+    const all=s.val()||{};const now=Date.now();
+    Object.entries(all).forEach(([k,f])=>{
+      if(f.expireAt<now){db.ref('flags/'+k).remove();return;}
+      const mins=Math.ceil((f.expireAt-now)/60000);
+      const icon=L.divIcon({className:'',html:'<div style="font-size:22px;text-shadow:0 0 8px #ff9900;filter:drop-shadow(0 0 4px #ff9900);">🚩</div>',iconSize:[24,24],iconAnchor:[12,24]});
+      const m=L.marker([f.lat,f.lng],{icon}).addTo(map);
+      m.bindTooltip('🚩 '+(f.clan?'['+f.clan+'] ':'')+f.nick+' · '+mins+'мин',{permanent:false});
+      flagMarkers.push(m);
+    });
+  });
+}
+
+// ══ DAILY QUEST ══
+function todayKey(){const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+function checkDailyQuest(){
+  if(!P)return;
+  const today=todayKey();
+  // Новый день — сбрасываем квест и выдаём флаг (если уровень 5+)
+  if(P.lastQuestDate!==today){
+    P.lastQuestDate=today;
+    P.questDone=false;
+    P.questProgress=0;
+    if(P.level>=5)P.flagAvailable=true;
+    saveP();updS();
+  }
+}
+function updateQuestProgress(pixelsPlaced){
+  if(!P||P.questDone)return;
+  P.questProgress=(P.questProgress||0)+pixelsPlaced;
+  if(P.questProgress>=3&&!P.questDone){
+    P.questDone=true;
+    // Streak
+    const today=todayKey();
+    if(P.lastQuestDate===today)P.streak=(P.streak||0)+1;
+    saveP();updS();
+    notify('🎯 ЗАДАНИЕ ВЫПОЛНЕНО!\n🔥 Серия: '+P.streak+' дней!');
+    loadActivityPanel();
+  } else {
+    saveP();
+  }
+}
+function loadActivityPanel(){
+  if(!P)return;
+  const body=document.getElementById('actbody');
+  const today=todayKey();
+  const done=P.questDone||false;
+  const prog=Math.min(P.questProgress||0,3);
+  const pct=Math.round(prog/3*100);
+  const streak=P.streak||0;
+  const flagTxt=P.level>=5?(P.flagAvailable?'✅ Доступен! Нажми 🚩 на панели':'Уже использован сегодня'):'🔒 Открывается на 5 уровне';
+  const dur=P.level>=5?Math.round(flagDuration(P.level)/60000):'-';
+
+  const fireClass = done ? 'streak-fire' : 'streak-fire gray';
+  const numClass = done ? 'streak-num' : 'streak-num gray';
+  body.innerHTML=`
+    <div class="streak-box">
+      <div class="${fireClass}">🔥</div>
+      <div class="streak-info">
+        <div class="${numClass}">${streak}</div>
+        <div class="streak-label">ДНЕЙ СЕРИИ</div>
+      </div>
+      <div style="margin-left:auto;font-size:12px;color:var(--dim);font-family:'Press Start 2P',monospace;">${done?'✅ ВЫПОЛНЕНО':'⏳ НЕ ВЫПОЛНЕНО'}</div>
+    </div>
+    <div class="quest-card" style="${done?'border-color:var(--green);':'' }">
+      <div class="quest-title">${done?'✅':'📋'} ЗАДАНИЕ ДНЯ</div>
+      <div class="quest-desc">Установи 3 пикселя в любом месте.<br><span style="color:var(--dim);font-size:12px;">Так вы поддерживаете серию!</span></div>
+      <div style="font-size:13px;color:var(--accent);">${prog}/3 пикселей</div>
+      <div class="quest-progress"><div class="quest-fill" style="width:${pct}%"></div></div>
+      ${done?'<div style="color:var(--green);font-family:\'Press Start 2P\',monospace;font-size:7px;">ВЫПОЛНЕНО! +1 к серии</div>':''}
+    </div>
+    <div class="flag-info">
+      <b style="font-family:'Press Start 2P',monospace;font-size:7px;color:#ff9900;">🚩 ФЛАГ АКТИВНОСТИ</b><br>
+      ${flagTxt}<br>
+      <span style="color:var(--dim);font-size:12px;">Время: ${dur} мин · Ставится раз в день</span>
+    </div>
+    <div style="font-size:12px;color:var(--dim);text-align:center;padding:4px;">Больше заданий появится в v1.3!</div>
+  `;
+}
+
+// ══ CLANS ══
+async function loadClan(){
+  const inner=document.getElementById('clinner');inner.innerHTML='<div style="color:var(--dim);font-size:12px;">Загрузка...</div>';
+  db.ref('clans').once('value',s=>{
+    const cls=s.val()||{};inner.innerHTML='';
+    if(P.clan){
+      const cl=cls[P.clan];
+      if(cl){
+        const mc=Object.keys(cl.members||{}).length;
+        const isOwner=cl.owner===P.nick;const isOfficer=cl.officers&&cl.officers[P.nick];
+        inner.innerHTML=`<div class="sect">МОЙ КЛАН</div>
+          <div class="crow" style="flex-direction:column;align-items:flex-start;gap:3px;">
+            <div><span class="ctg" style="background:${cl.color||'#444'};color:#fff;">[${esc(P.clan)}]</span><b>${esc(cl.name)}</b></div>
+            <div style="font-size:11px;color:var(--dim);">${mc}/${cl.maxMembers||150} · 👑 ${esc(cl.owner)}</div>
+          </div>
+          ${isOwner||isOfficer?'<button class="cbtn" style="background:var(--blue);border-color:var(--blue);color:#000;margin-top:3px;" onclick="manageClanMembers()">👥 УЧАСТНИКИ</button>':''}
+          <button class="cbtn" style="background:var(--red);border-color:var(--red);color:#fff;margin-top:3px;" onclick="leaveClan()">🚪 ПОКИНУТЬ</button>
+          ${isOwner?'<button class="cbtn" style="background:#ff0000;border-color:#ff0000;color:#fff;margin-top:3px;" onclick="deleteMyClan()">🗑️ УДАЛИТЬ КЛАН</button>':''}`;
+        return;
+      }
+    }
+    inner.innerHTML=`<button class="cbtn" onclick="tcf()">+ СОЗДАТЬ КЛАН</button><div id="ccf" style="display:none;flex-direction:column;gap:5px;"><input class="ai" id="cnn" placeholder="Название" maxlength="24" type="text"/><input class="ai" id="cnt" placeholder="ТЕГ (2-5 букв)" maxlength="5" type="text"/><div style="display:flex;align-items:center;gap:5px;font-size:13px;">Цвет:<input type="color" id="cnc" value="#4ade80" style="width:40px;height:26px;border:none;border-radius:3px;cursor:pointer;"></div><button class="cbtn" onclick="createClan()">СОЗДАТЬ</button></div><div class="sect" style="margin-top:3px;">ВСЕ КЛАНЫ</div><div id="clist"></div>`;
+    const list=document.getElementById('clist');
+    const en=Object.entries(cls);
+    if(!en.length){list.innerHTML='<div style="color:var(--dim);font-size:12px;text-align:center;padding:5px;">Кланов нет!</div>';return;}
+    en.slice(0,30).forEach(([tag,cl])=>{
+      const mc=Object.keys(cl.members||{}).length;
+      const row=document.createElement('div');row.className='crow';
+      row.innerHTML=`<div><span class="ctg" style="background:${cl.color||'#444'};color:#fff;">[${esc(tag)}]</span><b>${esc(cl.name)}</b><div style="font-size:11px;color:var(--dim);">${mc}/${cl.maxMembers||150}·👑${esc(cl.owner)}</div></div><button class="jb" onclick="joinClan('${esc(tag)}')">ВСТУПИТЬ</button>`;
+      list.appendChild(row);
+    });
+  });
+}
+function manageClanMembers(){
+  if(!P.clan)return;
+  db.ref('clans/'+P.clan+'/members').once('value',s=>{
+    const members=s.val()||{};
+    let html='<div class="sect">УЧАСТНИКИ КЛАНА</div>';
+    Object.keys(members).forEach(nick=>{html+=`<div class="crow"><span>${esc(nick)}</span><button class="rb" style="font-size:5px;padding:3px;" onclick="kickFromClan('${esc(nick)}')">КИК</button></div>`;});
+    html+='<button class="cbtn" onclick="loadClan()">НАЗАД</button>';
+    document.getElementById('clinner').innerHTML=html;
+  });
+}
+async function kickFromClan(nick){
+  if(!P.clan)return;
+  const s=await db.ref('clans/'+P.clan).once('value');const cl=s.val();
+  if(cl.owner!==P.nick&&!(cl.officers&&cl.officers[P.nick])){notify('❌ Нет прав!');return;}
+  if(cl.owner===nick){notify('❌ Нельзя кикнуть создателя!');return;}
+  await db.ref('clans/'+P.clan+'/members/'+nick).remove();
+  await db.ref('players/'+nick).update({clan:''});
+  pChat(null,'👢 '+nick+' исключён из клана','sys','');
+  notify('✅ '+nick+' исключён');manageClanMembers();
+}
+function tcf(){const f=document.getElementById('ccf');if(f)f.style.display=f.style.display==='none'?'flex':'none';}
+async function createClan(){
+  const name=(document.getElementById('cnn')||{}).value?.trim();
+  const tag=(document.getElementById('cnt')||{}).value?.trim().toUpperCase();
+  const color=(document.getElementById('cnc')||{}).value;
+  if(!name||!tag||tag.length<2){notify('Введи название и тег!');return;}
+  const maxClansSnap=await db.ref('config/maxClans').once('value');
+  const maxClans=maxClansSnap.val()||50;
+  const clansSnap=await db.ref('clans').once('value');
+  if(clansSnap.numChildren()>=maxClans){notify('❌ Лимит кланов ('+maxClans+')!');return;}
+  const s=await db.ref('clans/'+tag).once('value');if(s.exists()){notify('Тег занят!');return;}
+  await db.ref('clans/'+tag).set({name,tag,color,owner:P.nick,members:{[P.nick]:true},officers:{},maxMembers:150,created:Date.now()});
+  P.clan=tag;saveP();pChat(null,'⚔️ '+P.nick+' создал ['+tag+']!','sys','');notify('⚔️ Клан создан!');loadClan();updS();
+}
+async function joinClan(tag){
+  const s=await db.ref('clans/'+tag).once('value');if(!s.exists()){notify('Не найден!');return;}
+  const cl=s.val();
+  if(Object.keys(cl.members||{}).length>=(cl.maxMembers||150)){notify('❌ Клан полон!');return;}
+  await db.ref('clans/'+tag+'/members/'+P.nick).set(true);
+  P.clan=tag;saveP();pChat(null,'➕ '+P.nick+' в ['+tag+']!','sys','');notify('✅ Добро пожаловать!');loadClan();updS();
+}
+async function leaveClan(){
+  if(!P.clan)return;const tag=P.clan;
+  const s=await db.ref('clans/'+tag).once('value');const cl=s.val();
+  if(cl.owner===P.nick){
+    if(!confirm('⚠️ Вы создатель! При выходе клан будет удалён.'))return;
+    await db.ref('clans/'+tag).remove();pChat(null,'⚔️ Клан ['+tag+'] расформирован','sys','');
+  } else {
+    await db.ref('clans/'+tag+'/members/'+P.nick).remove();pChat(null,'➖ '+P.nick+' покинул ['+tag+']','sys','');
+  }
+  P.clan='';saveP();notify('Покинул клан.');loadClan();updS();
+}
+async function deleteMyClan(){
+  if(!P.clan)return;if(!confirm('⚠️ Клан будет удалён навсегда!'))return;
+  const tag=P.clan;const s=await db.ref('clans/'+tag).once('value');const cl=s.val();
+  if(cl.owner!==P.nick){notify('❌ Только создатель!');return;}
+  await db.ref('clans/'+tag).remove();
+  const players=await db.ref('players').once('value');const updates={};
+  players.forEach(p=>{if(p.val().clan===tag)updates['players/'+p.key+'/clan']='';});
+  if(Object.keys(updates).length)await db.ref().update(updates);
+  P.clan='';saveP();notify('🗑️ Клан удалён!');pChat(null,'⚔️ Клан ['+tag+'] расформирован','sys','');loadClan();updS();
+}
+
+// ══ BAN SYSTEM ══
+function listenBans(){db.ref('banned').on('value',s=>{bannedPlayers=s.val()||{};});}
+async function banPlayer(nick,durationHours,reason){
+  if(!isAdmin){notify('❌ Нет прав!');return;}
+  const expires=Date.now()+durationHours*60*60*1000;
+  await db.ref('banned/'+nick).set({nick,expires,reason:reason||'',bannedBy:P.nick,bannedAt:Date.now()});
+  await db.ref('online/'+nick).remove();
+  pChat(null,'🔨 '+nick+' забанен на '+durationHours+'ч. Причина: '+(reason||'не указана'),'sys','');
+  notify('✅ '+nick+' забанен!');
+}
+
+// ══ WIPE TIMER ══
+async function startWipeTimer(){
+  if(wipeInterval)clearInterval(wipeInterval);
+  wipeInterval=setInterval(async()=>{
+    const s=await db.ref('config/wipeTime').once('value');
+    const wipeTime=s.val();const el=document.getElementById('wipetime');
+    if(!wipeTime){el.textContent='--:--:--';return;}
+    const diff=wipeTime-Date.now();
+    if(diff<=0){el.textContent='00:00:00';if(isAdmin)notify('⏰ Время вайпа!');return;}
+    const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),sec=Math.floor((diff%60000)/1000);
+    el.textContent=h.toString().padStart(2,'0')+':'+m.toString().padStart(2,'0')+':'+sec.toString().padStart(2,'0');
+  },1000);
+}
+async function updateOnlineCounter(){
+  const cut=Date.now()-2*60*1000;
+  const s=await db.ref('online').once('value');
+  const all=s.val()||{};
+  document.getElementById('onlinecount').textContent=Object.values(all).filter(u=>u.t>cut).length;
+}
+
+
+// ══ ADMIN ══
+function unlockAdmin(){
+  const pass=document.getElementById('adm-pass-inp').value.trim();
+  if(pass!==ADMIN_PASS){notify('❌ Неверный пароль!');return;}
+  isAdmin=true;loadAdminPanel();
+}
+function loadAdminPanel(){
+  const body=document.getElementById('admbody');
+  if(!isAdmin){
+    body.innerHTML=`<div style="color:var(--dim);font-size:12px;text-align:center;padding:8px;">Введи пароль</div><div style="display:flex;flex-direction:column;gap:5px;padding:4px;"><input class="ai" id="adm-pass-inp" placeholder="Пароль админа" type="password"/><button class="bb" onclick="unlockAdmin()" style="font-size:7px;padding:7px;">ВОЙТИ КАК АДМИН</button></div>`;
+    return;
+  }
+  body.innerHTML=`
+    <div class="arow"><label>🟢 ОНЛАЙН</label><div id="onl" style="font-size:12px;color:var(--green);line-height:1.8;">...</div><button class="bb" onclick="loadOnline()" style="align-self:flex-start;font-size:6px;">ОБНОВИТЬ</button></div>
+    <div class="arow"><label>📢 СООБЩЕНИЕ ВСЕМ</label><input class="ai" id="amsg" placeholder="Текст..." type="text"/><button class="bb" onclick="aBcast()" style="align-self:flex-start;">ОТПРАВИТЬ</button></div>
+    <div class="arow"><label>💡 ВЫДАТЬ ЛАМПОЧКИ</label><input class="ai" id="anb" placeholder="Ник" type="text"/><input class="ai" id="aamt" placeholder="Количество" type="number"/><button class="bb" onclick="aGiveBulbs()" style="align-self:flex-start;">ВЫДАТЬ</button></div>
+    <div class="arow"><label>⚡ УРОВЕНЬ (1-15)</label><input class="ai" id="anl" placeholder="Ник" type="text"/><input class="ai" id="alvl" placeholder="1–15" type="number" min="1" max="15"/><button class="bb" onclick="aSetLvl()" style="align-self:flex-start;">УСТАНОВИТЬ</button></div>
+    <div class="arow"><label>🚩 ВЫДАТЬ ФЛАГ ИГРОКУ</label><input class="ai" id="aflagn" placeholder="Ник" type="text"/><button class="bb" onclick="aGiveFlag()" style="align-self:flex-start;">ВЫДАТЬ ФЛАГ</button></div>
+    <div class="arow"><label>🔖 АКЦИЯ (СКИДКА)</label>
+      <div style="font-size:12px;color:var(--dim);">Введи % скидки и время окончания</div>
+      <input class="ai" id="asaledisc" placeholder="Скидка %" type="number" value="20"/>
+      <input class="ai" id="asalehours" placeholder="Длительность (часов)" type="number" value="3"/>
+      <div style="display:flex;gap:5px;"><button class="bb" onclick="aStartSale()" style="flex:1;">▶ НАЧАТЬ АКЦИЮ</button><button class="rb" onclick="aEndSale()" style="flex:1;">■ СТОП</button></div>
+    </div>
+    <div class="arow"><label>🔐 СМЕНИТЬ ПАРОЛЬ</label><input class="ai" id="achangenick" placeholder="Ник" type="text"/><input class="ai" id="achangepass" placeholder="Новый пароль" type="text"/><button class="bb" onclick="aChangePass()">СМЕНИТЬ</button></div>
+    <div class="arow"><label>🔨 ЗАБАНИТЬ</label><input class="ai" id="abannick" placeholder="Ник" type="text"/><input class="ai" id="abanhours" placeholder="Часы" type="number" value="24"/><input class="ai" id="abanreason" placeholder="Причина" type="text"/><button class="rb" onclick="aBanPlayer()">ЗАБАНИТЬ</button></div>
+    <div class="arow"><label>⏳ ВАЙП ЧЕРЕЗ (часов)</label><input class="ai" id="awipetime" placeholder="Часы" type="number" value="24"/><button class="bb" onclick="aSetWipe()">УСТАНОВИТЬ</button></div>
+    <div class="arow"><label>👥 УДАЛИТЬ КЛАН</label><input class="ai" id="aclanname" placeholder="Тег клана" type="text"/><button class="rb" style="font-size:7px;padding:7px;" onclick="aDeleteClan()">🗑️ УДАЛИТЬ</button></div>
+    <div class="arow"><label>⚙️ ЛИМИТЫ</label><div style="display:flex;gap:5px;"><input class="ai" id="amaxclans" placeholder="Макс. кланов" type="number" value="50"/><button class="bb" onclick="aSetMaxClans()">ОК</button></div><div style="display:flex;gap:5px;margin-top:3px;"><input class="ai" id="amaxmembers" placeholder="Макс. в клане" type="number" value="150"/><button class="bb" onclick="aSetMaxMembers()">ОК</button></div></div>
+    <div class="arow"><label>🗑️ ОЧИСТИТЬ ПИКСЕЛИ</label><button class="rb" style="font-size:7px;padding:7px;" onclick="aClrPx()">⚠️ ОЧИСТИТЬ ВСЁ</button></div>
+    <div class="arow"><label>📌 ВЕРСИЯ ИГРЫ</label><input class="ai" id="aversion" placeholder="Версия" type="text" value="1.2"/><button class="bb" onclick="aSetVersion()">СМЕНИТЬ</button></div>
+    <div class="arow"><label>📢 ОБНОВЛЕНИЕ</label>
+      <input class="ai" id="aupdversion" placeholder="Версия" type="text" value="1.2"/>
+      <input class="ai" id="aupdtitle" placeholder="Заголовок" type="text" value="ОБНОВЛЕНИЕ"/>
+      <textarea class="ai" id="aupdtext" placeholder="Текст обновления..." rows="3" style="resize:vertical;"></textarea>
+      <input class="ai" id="aupdtimes" placeholder="Сколько раз показать" type="number" value="1"/>
+      <input class="ai" id="aupdhours" placeholder="Часы между показами" type="number" value="0"/>
+      <button class="bb" onclick="aSetUpdate()">ОТПРАВИТЬ</button>
+      <button class="rb" style="font-size:6px;padding:4px;margin-top:3px;" onclick="aDisableUpdate()">🗑️ СКРЫТЬ</button>
+    </div>
+    <div class="arow"><label>⚙️ ТЕХ. РАБОТЫ</label><div style="display:flex;gap:5px;"><button class="rb" style="font-size:7px;padding:7px;flex:1;" onclick="aMaint(true)">▶ ВКЛ</button><button class="blb" style="font-size:7px;padding:7px;flex:1;" onclick="aMaint(false)">■ ВЫКЛ</button></div></div>
+  `;
+  loadOnline();
+}
+function loadOnline(){
+  const cut=Date.now()-2*60*1000;
+  db.ref('online').once('value',s=>{
+    const all=s.val()||{};const act=Object.values(all).filter(u=>u.t>cut);
+    const el=document.getElementById('onl');if(!el)return;
+    el.innerHTML=act.length?'<b style="color:var(--accent)">'+act.length+' онлайн:</b><br>'+act.map(u=>'<span class="odot"></span>'+esc(u.nick)+(u.clan?' ['+u.clan+']':'')).join('  '):'Никого нет';
+  });
+}
+async function aGiveBulbs(){
+  const nick=document.getElementById('anb').value.trim();const amt=parseInt(document.getElementById('aamt').value);
+  if(!nick||isNaN(amt)||amt<=0){notify('Заполни поля!');return;}
+  const s=await db.ref('players/'+nick).once('value');if(!s.exists()){notify('Игрок не найден!');return;}
+  await db.ref('players/'+nick).update({bulbs:(s.val().bulbs||0)+amt});
+  notify('✅ '+amt+'💡 → '+nick);pChat(null,'👑 Выдано '+amt+'💡 → '+nick,'sys','');
+}
+async function aSetLvl(){
+  const nick=document.getElementById('anl').value.trim();const lvl=parseInt(document.getElementById('alvl').value);
+  if(!nick||isNaN(lvl)||lvl<1||lvl>15){notify('Заполни поля! Уровень 1-15');return;}
+  const s=await db.ref('players/'+nick).once('value');if(!s.exists()){notify('Игрок не найден!');return;}
+  const colors=COLORS.slice(0,colorsForLevel(lvl));
+  await db.ref('players/'+nick).update({level:lvl,xp:0,inkMax:15+(lvl-1)*5,colors});
+  notify('✅ '+nick+' → Ур.'+lvl);pChat(null,'👑 '+nick+' → Ур.'+lvl,'sys','');
+}
+async function aGiveFlag(){
+  const nick=document.getElementById('aflagn').value.trim();
+  if(!nick){notify('Введи ник!');return;}
+  const s=await db.ref('players/'+nick).once('value');if(!s.exists()){notify('Игрок не найден!');return;}
+  await db.ref('players/'+nick).update({flagAvailable:true});
+  notify('✅ Флаг выдан игроку '+nick+'!');
+  pChat(null,'👑 Админ выдал флаг игроку '+nick,'sys','');
+}
+async function aStartSale(){
+  const disc=parseInt(document.getElementById('asaledisc').value)||20;
+  const hours=parseInt(document.getElementById('asalehours').value)||3;
+  const expireAt=Date.now()+hours*60*60*1000;
+  await db.ref('config/sale').set({active:true,discount:disc,expireAt,startedBy:P.nick,startedAt:Date.now()});
+  notify('✅ Акция -'+disc+'% запущена на '+hours+'ч!');
+  pChat(null,'🔖 АКЦИЯ! Скидка -'+disc+'% на '+hours+' часов!','sys','');
+}
+async function aEndSale(){
+  await db.ref('config/sale').update({active:false});
+  notify('✅ Акция завершена!');
+}
+async function aClrPx(){
+  if(!confirm('⚠️ УДАЛИТЬ ВСЕ ПИКСЕЛИ?'))return;
+  await db.ref('pixels').remove();
+  Object.keys(pxL).forEach(k=>{map.removeLayer(pxL[k]);delete pxL[k];});
+  Object.keys(pxD).forEach(k=>delete pxD[k]);
+  notify('🗑️ Пиксели очищены!');pChat(null,'👑 Пиксели очищены!','sys','');
+}
+function aBcast(){
+  const msg=document.getElementById('amsg').value.trim();if(!msg){notify('Введи сообщение!');return;}
+  db.ref('broadcast').set({msg,t:Date.now()});document.getElementById('amsg').value='';notify('📢 Отправлено!');
+}
+function aMaint(on){db.ref('maintenance').set({on,t:Date.now()});notify(on?'⚙️ Пауза ВКЛ':'✅ Пауза ВЫКЛ');}
+async function aChangePass(){
+  const nick=document.getElementById('achangenick').value.trim();const pass=document.getElementById('achangepass').value.trim();
+  if(!nick||!pass){notify('Заполни поля!');return;}
+  await db.ref('players/'+nick).update({pass});notify('✅ Пароль для '+nick+' изменён!');
+}
+async function aBanPlayer(){
+  const nick=document.getElementById('abannick').value.trim();const hours=parseInt(document.getElementById('abanhours').value);const reason=document.getElementById('abanreason').value.trim();
+  if(!nick||isNaN(hours)||hours<=0){notify('Заполни ник и часы!');return;}
+  await banPlayer(nick,hours,reason);
+}
+async function aSetWipe(){
+  const hours=parseInt(document.getElementById('awipetime').value);
+  if(isNaN(hours)||hours<=0){notify('Введи число > 0!');return;}
+  await db.ref('config/wipeTime').set(Date.now()+hours*60*60*1000);
+  notify('✅ Вайп через '+hours+' часов!');startWipeTimer();
+}
+async function aDeleteClan(){
+  const tag=document.getElementById('aclanname').value.trim().toUpperCase();if(!tag){notify('Введи тег!');return;}
+  const s=await db.ref('clans/'+tag).once('value');if(!s.exists()){notify('Клан не найден!');return;}
+  await db.ref('clans/'+tag).remove();
+  const players=await db.ref('players').once('value');const updates={};
+  players.forEach(p=>{if(p.val().clan===tag)updates['players/'+p.key+'/clan']='';});
+  if(Object.keys(updates).length)await db.ref().update(updates);
+  notify('🗑️ Клан ['+tag+'] удалён!');pChat(null,'👑 Клан ['+tag+'] удалён','sys','');
+}
+async function aSetMaxClans(){const max=parseInt(document.getElementById('amaxclans').value);if(isNaN(max)||max<1){notify('Введи число > 0!');return;}await db.ref('config/maxClans').set(max);notify('✅ Макс. кланов: '+max);}
+async function aSetMaxMembers(){const max=parseInt(document.getElementById('amaxmembers').value);if(isNaN(max)||max<1){notify('Введи число > 0!');return;}await db.ref('config/maxMembers').set(max);notify('✅ Макс. в клане: '+max);}
+async function aSetVersion(){const version=document.getElementById('aversion').value.trim();if(!version){notify('Введи версию!');return;}await db.ref('config/version').set(version);updateVersionDisplay(version);notify('✅ Версия → '+version);}
+
+// ══ VERSION ══
+function updateVersionDisplay(v){document.title='💡 Pixel Battle v'+v;document.querySelector('.llogo').innerHTML='💡 PIXEL<br>BATTLE v'+v;document.querySelector('.logo').textContent='💡PB v'+v;}
+function listenVersion(){db.ref('config/version').on('value',s=>{updateVersionDisplay(s.val()||'1.2');});}
+
+// ══ UPDATE SYSTEM ══
+function closeUpdatePanel(){
+  document.getElementById('updatepanel').style.display='none';
+  var shown=JSON.parse(localStorage.getItem('pb_updates_shown')||'[]');
+  var updateId=localStorage.getItem('pb_update_id');
+  if(updateId){shown.push({id:updateId,time:Date.now()});localStorage.setItem('pb_updates_shown',JSON.stringify(shown));}
+}
+async function checkUpdatePanel(){
+  var s=await db.ref('config/update').once('value');var update=s.val();
+  if(!update||!update.active)return false;
+  var shown=JSON.parse(localStorage.getItem('pb_updates_shown')||'[]');
+  var thisUpdateShown=shown.filter(function(item){return item.id===update.id;}).length;
+  if(thisUpdateShown>=update.showTimes)return false;
+  if(update.hoursBetween>0){var lastShown=shown.filter(function(item){return item.id===update.id;}).sort(function(a,b){return b.time-a.time;})[0];if(lastShown&&Date.now()-lastShown.time<update.hoursBetween*60*60*1000)return false;}
+  document.getElementById('updateVersion').textContent='v'+(update.version||'1.2');
+  document.getElementById('updateTitle').textContent=update.title||'ОБНОВЛЕНИЕ';
+  document.getElementById('updateText').textContent=update.text||'Новая версия!';
+  document.getElementById('updatepanel').style.display='flex';
+  localStorage.setItem('pb_update_id',update.id);return true;
+}
+async function aSetUpdate(){
+  var version=document.getElementById('aupdversion').value.trim();var title=document.getElementById('aupdtitle').value.trim();var text=document.getElementById('aupdtext').value.trim();
+  var showTimes=parseInt(document.getElementById('aupdtimes').value)||1;var hoursBetween=parseInt(document.getElementById('aupdhours').value)||0;
+  if(!text){notify('Введи текст!');return;}
+  await db.ref('config/update').set({id:Date.now().toString(),version:version||'1.2',title:title||'ОБНОВЛЕНИЕ',text,showTimes,hoursBetween,active:true,createdAt:Date.now()});
+  notify('✅ Обновление отправлено!');pChat(null,'📢 Вышло новое обновление!','sys','');
+}
+async function aDisableUpdate(){await db.ref('config/update/active').set(false);notify('✅ Обновление скрыто!');}
+
+// ══ LISTENERS ══
+function listenMaint(){
+  db.ref('maintenance').on('value',s=>{
+    const d=s.val();
+    if(d&&d.on&&P&&P.nick!=='Danya amlet'&&!isAdmin)document.getElementById('maint').classList.add('on');
+    else document.getElementById('maint').classList.remove('on');
+  });
+}
+function listenBcast(){
+  let lt=0;
+  db.ref('broadcast').on('value',s=>{const d=s.val();if(!d||d.t<=lt)return;lt=d.t;document.getElementById('btxt').textContent='📢 '+d.msg;document.getElementById('bcast').style.display='block';});
+}
+
+// ══ PANELS ══
+function togglePanel(id,btn){
+  const p=document.getElementById(id);const op=p.classList.contains('open');
+  closeAll();
+  if(!op){p.classList.add('open');if(btn)document.getElementById(btn).classList.add('on');if(id==='cpanel')setTimeout(()=>swtab(ctab),50);}
+}
+function closeAll(){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('open'));document.querySelectorAll('.ibtn').forEach(b=>b.classList.remove('on'));}
+
+// ══ TOOLTIP / NOTIFY ══
+const tp=document.getElementById('tip');
+function tipAt(x,y,t){tp.style.display='block';tp.style.left=(x+8)+'px';tp.style.top=(y-28)+'px';tp.textContent=t;}
+function hideTip(){tp.style.display='none';}
+let nt=null;
+function notify(t){const el=document.getElementById('notify');el.innerHTML=t.replace(/\n/g,'<br>');el.style.display='block';clearTimeout(nt);nt=setTimeout(()=>el.style.display='none',3500);}
+
+document.getElementById('lp').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+window.addEventListener('load',()=>{autoLogin();});
+</script>
+</body>
+</html>
+ 
