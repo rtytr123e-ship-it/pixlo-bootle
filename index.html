@@ -1,0 +1,3181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>💡 Pixel Battle v1.2</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+:root{--bg:#0a0a0f;--panel:#12121a;--border:#2a2a3a;--accent:#f5c542;--green:#4ade80;--red:#ff6b6b;--blue:#60a5fa;--text:#e0e0f0;--dim:#888;}
+html,body{height:100%;width:100%;overflow:hidden;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'VT323',monospace;display:flex;flex-direction:column;position:fixed;inset:0;font-size:15px;}
+input,textarea{font-family:'VT323',monospace;user-select:text!important;-webkit-user-select:text!important;}
+
+/* MAINTENANCE */
+#maint{position:fixed;inset:0;background:#000;z-index:99999;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;}
+#maint.on{display:flex;}
+.mspin{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.mtext{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--accent);text-align:center;line-height:2.5;text-shadow:0 0 15px var(--accent);}
+
+/* BROADCAST */
+#bcast{position:fixed;top:0;left:0;right:0;background:var(--accent);color:#000;font-family:'Press Start 2P',monospace;font-size:8px;padding:8px;text-align:center;z-index:9990;display:none;cursor:pointer;line-height:1.8;}
+
+/* LOGIN */
+#lscreen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
+.lbox{background:var(--panel);border:2px solid var(--accent);border-radius:12px;padding:22px 20px;display:flex;flex-direction:column;gap:10px;width:min(280px,88vw);}
+.llogo{font-family:'Press Start 2P',monospace;font-size:11px;color:var(--accent);text-shadow:0 0 14px var(--accent);text-align:center;line-height:2.2;}
+.inp{background:#1a1a28;border:1px solid var(--border);color:var(--text);font-size:17px;padding:7px 10px;border-radius:5px;outline:none;width:100%;}
+.inp:focus{border-color:var(--accent);}
+.lbtn{background:var(--accent);border:none;color:#000;font-family:'Press Start 2P',monospace;font-size:8px;padding:11px;border-radius:5px;cursor:pointer;width:100%;}
+.lhint{color:var(--dim);font-size:12px;text-align:center;}
+#lerr{color:var(--red);font-size:12px;text-align:center;min-height:15px;}
+
+/* TOP BAR */
+#topbar{background:var(--panel);border-bottom:2px solid var(--accent);padding:0 6px;height:36px;display:flex;align-items:center;gap:4px;flex-shrink:0;z-index:1000;overflow-x:auto;overflow-y:hidden;white-space:nowrap;}
+#topbar::-webkit-scrollbar{display:none;}
+.logo{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);text-shadow:0 0 7px var(--accent);flex-shrink:0;}
+.st{background:#1a1a28;border:1px solid var(--border);padding:1px 5px;border-radius:3px;font-size:13px;display:inline-flex;align-items:center;gap:2px;flex-shrink:0;}
+.v{color:var(--accent);}
+#rbar{width:30px;height:3px;background:#222;border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:1px;}
+#rfill{height:100%;background:var(--blue);width:0%;transition:width 1s linear;}
+#mbtn{background:#1a1a28;border:1px solid var(--border);border-radius:3px;padding:1px 6px;cursor:pointer;font-size:13px;flex-shrink:0;display:inline-flex;align-items:center;gap:2px;}
+
+/* WIPE TIMER */
+#wipetimer{position:fixed;top:42px;right:8px;background:rgba(10,10,20,.92);border:1px solid var(--accent);border-radius:5px;padding:4px 8px;font-family:'Press Start 2P',monospace;font-size:6px;color:var(--accent);z-index:2000;display:flex;flex-direction:column;gap:2px;text-align:center;line-height:1.8;}
+#wipetimer span{color:var(--green);font-size:8px;}
+
+/* ONLINE COUNTER */
+#onlinecounter{position:fixed;top:94px;right:8px;background:rgba(10,10,20,.92);border:1px solid var(--blue);border-radius:5px;padding:4px 8px;font-family:'Press Start 2P',monospace;font-size:6px;color:var(--blue);z-index:2000;display:flex;align-items:center;gap:4px;}
+#onlinecounter span{color:var(--green);font-size:8px;}
+
+/* OFFLINE BOOST INDICATOR */
+#offlinebadge{position:fixed;top:136px;right:8px;background:rgba(10,10,20,.92);border:1px solid var(--green);border-radius:5px;padding:4px 8px;font-family:'Press Start 2P',monospace;font-size:6px;color:var(--green);z-index:2000;display:none;align-items:center;gap:4px;line-height:1.8;}
+
+
+/* MAP */
+#map{flex:1;z-index:1;position:relative;min-height:0;}
+.leaflet-container{background:#0d1a2e!important;}
+#zhint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(10,10,20,.92);color:var(--accent);font-family:'Press Start 2P',monospace;font-size:8px;padding:12px 16px;border-radius:8px;z-index:800;text-align:center;line-height:2;pointer-events:none;display:none;}
+
+/* BOTTOM BAR */
+#bottombar{background:var(--panel);border-top:2px solid var(--border);padding:0 5px;height:52px;display:flex;align-items:center;gap:4px;flex-shrink:0;z-index:1000;overflow-x:auto;overflow-y:hidden;}
+#bottombar::-webkit-scrollbar{display:none;}
+
+/* PALETTE — сетка: 8 цветов в ряд, с прокруткой и выступанием */
+#palwrap{
+  display:flex;
+  align-items:flex-start;
+  gap:2px;
+  flex-shrink:0;
+  position:relative;
+  padding:3px 0;
+}
+#palette{
+  display:grid;
+  grid-template-columns:repeat(8, 22px);
+  grid-auto-rows:22px;
+  gap:3px;
+  max-height:50px;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:3px;
+  margin:-3px;
+  transition:max-height .3s;
+  scrollbar-width:thin;
+  scrollbar-color:var(--accent) #1a1a28;
+}
+#palette::-webkit-scrollbar{
+  width:4px;
+}
+#palette::-webkit-scrollbar-thumb{
+  background:var(--accent);
+  border-radius:2px;
+}
+#palette.exp{
+  max-height:150px;
+}
+
+/* pinsMenu styles defined below in v1.3 section */
+.clr{
+  width:22px;
+  height:22px;
+  border-radius:4px;
+  border:2px solid #444;
+  cursor:pointer;
+  flex-shrink:0;
+  position:relative;
+  transition:transform 0.1s;
+  z-index:10;
+}
+.clr:hover{
+  transform:scale(1.15);
+  z-index:20;
+  border-color:#fff !important;
+}
+.clr.on{
+  border-color:#fff !important;
+  box-shadow:0 0 8px rgba(255,255,255,0.9);
+  transform:scale(1.05);
+  z-index:15;
+}
+.clr.lk{
+  opacity:0.18;
+  cursor:not-allowed;
+  filter:grayscale(1);
+}
+.clr.dark{
+  border:2px solid #888 !important;
+}
+.clr.on.dark{
+  border-color:#fff !important;
+}
+#paltog{
+  width:18px;
+  height:18px;
+  background:#1a1a28;
+  border:1px solid var(--accent);
+  border-radius:3px;
+  cursor:pointer;
+  font-size:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+  color:var(--accent);
+  align-self:flex-start;
+  margin-top:2px;
+}
+
+/* ACTION BUTTONS */
+.abtn{font-family:'Press Start 2P',monospace;font-size:6px;border:2px solid;border-radius:4px;cursor:pointer;padding:4px 6px;line-height:1.6;white-space:nowrap;flex-shrink:0;}
+#pbtn{background:#1a1a28;border-color:var(--accent);color:var(--accent);}
+#pbtn.on{background:var(--accent);color:#000;}
+#dbtn{background:#1a1a28;border-color:var(--blue);color:var(--blue);display:none;}
+#dbtn.on{background:var(--blue);color:#000;}
+#okbtn{background:var(--green);border-color:var(--green);color:#000;display:none;}
+#cancbtn{background:transparent;border-color:var(--red);color:var(--red);display:none;}
+#flagbtn{background:#1a1a28;border-color:#ff9900;color:#ff9900;display:none;}
+#flagbtn.active{background:#ff9900;color:#000;}
+
+/* ICON BUTTONS */
+.ibtn{font-size:15px;background:#1a1a28;border:1px solid var(--border);color:var(--text);padding:3px 7px;border-radius:4px;cursor:pointer;flex-shrink:0;white-space:nowrap;}
+.ibtn:hover,.ibtn.on{border-color:var(--accent);color:var(--accent);}
+#admibtn{border-color:var(--red)!important;color:var(--red)!important;}
+#admibtn.on{background:var(--red);color:#000!important;}
+#actbtn{border-color:#ff9900!important;color:#ff9900!important;}
+#actbtn.on{background:#ff9900;color:#000!important;}
+#sep{width:1px;height:30px;background:var(--border);flex-shrink:0;}
+
+/* PANELS */
+.panel{position:absolute;left:0;right:0;bottom:52px;background:rgba(10,10,20,.98);border-top:2px solid var(--border);z-index:900;display:none;flex-direction:column;height:320px;}
+.panel.open{display:flex;}
+.ptit{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--dim);padding:5px 8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.pcls{cursor:pointer;color:var(--red);font-size:15px;padding:0 4px;}
+.pbody{flex:1;overflow-y:scroll;-webkit-overflow-scrolling:touch;padding:6px;display:flex;flex-direction:column;gap:5px;min-height:0;}
+#spanel{height:460px !important;}
+#admpanel{height:460px !important;}
+
+/* CHAT */
+#ctabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.ctab{flex:1;text-align:center;padding:5px;font-family:'Press Start 2P',monospace;font-size:6px;cursor:pointer;color:var(--dim);background:transparent;border:none;}
+.ctab.on{color:var(--accent);border-bottom:2px solid var(--accent);}
+#cmsgs{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:4px 8px;font-size:13px;display:flex;flex-direction:column;gap:2px;}
+.msys{color:var(--accent);font-size:12px;}
+.musr .nick{color:var(--green);}
+.musr .txt{color:#ccc;}
+#cirow{display:flex;border-top:1px solid var(--border);padding:4px 6px;gap:4px;flex-shrink:0;}
+#cinp{flex:1;background:#1a1a28;border:1px solid var(--border);color:var(--text);font-size:16px;padding:5px 8px;border-radius:5px;outline:none;}
+#cinp:focus{border-color:var(--accent);}
+#csend{background:var(--accent);border:none;color:#000;font-family:'Press Start 2P',monospace;font-size:6px;padding:5px 8px;border-radius:5px;cursor:pointer;}
+
+/* SHOP/CLAN/ADMIN */
+.sect{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);padding:3px 0 2px;}
+.sitem{background:#1a1a28;border:1px solid var(--border);border-radius:5px;padding:6px 8px;display:flex;justify-content:space-between;align-items:center;font-size:13px;gap:5px;}
+.si{flex:1;}
+.si small{color:var(--dim);font-size:11px;display:block;}
+.prc{color:var(--accent);font-size:12px;white-space:nowrap;}
+.sale-badge{color:var(--green);font-size:9px;font-family:'Press Start 2P',monospace;margin-left:3px;display:none;}
+.sale-badge.show{display:inline;}
+.bb{background:var(--accent);border:none;color:#000;font-family:'Press Start 2P',monospace;font-size:5px;padding:4px 6px;border-radius:3px;cursor:pointer;}
+.rb{background:var(--red);border:none;color:#fff;font-family:'Press Start 2P',monospace;font-size:5px;padding:4px 6px;border-radius:3px;cursor:pointer;}
+.blb{background:var(--blue);border:none;color:#000;font-family:'Press Start 2P',monospace;font-size:5px;padding:4px 6px;border-radius:3px;cursor:pointer;}
+.crow{background:#1a1a28;border:1px solid var(--border);border-radius:5px;padding:5px 8px;display:flex;justify-content:space-between;align-items:center;font-size:13px;gap:5px;}
+.ctg{font-family:'Press Start 2P',monospace;font-size:6px;padding:2px 4px;border-radius:3px;margin-right:3px;}
+.jb{background:var(--blue);border:none;color:#000;font-family:'Press Start 2P',monospace;font-size:5px;padding:4px 6px;border-radius:3px;cursor:pointer;}
+.cbtn{background:#1a1a28;border:1px solid var(--accent);color:var(--accent);font-family:'Press Start 2P',monospace;font-size:6px;padding:7px;border-radius:5px;cursor:pointer;width:100%;}
+.arow{background:#1a1a28;border:1px solid #ff6b6b33;border-radius:5px;padding:6px;display:flex;flex-direction:column;gap:4px;}
+.arow label{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--red);}
+.ai{background:#0a0a0f;border:1px solid var(--border);color:var(--text);font-size:14px;padding:4px 6px;border-radius:3px;outline:none;width:100%;font-family:'VT323',monospace;}
+.ai:focus{border-color:var(--accent);}
+.odot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:3px;}
+
+/* ACTIVITY/QUEST PANEL */
+#actpanel{height:460px !important;}
+
+/* ЛЕНТА ДНЕЙ — крупнее, удобнее тапать */
+.streak-lenta{display:flex;gap:6px;overflow-x:auto;padding:6px 2px;margin-bottom:8px;-webkit-overflow-scrolling:touch;}
+.streak-day{min-width:52px;height:64px;background:#1a1a28;border:2px solid #2a2a3a;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-family:'VT323',monospace;gap:2px;cursor:pointer;flex-shrink:0;transition:transform .15s;}
+.streak-day:active{transform:scale(.92);}
+.streak-day.done{background:#1a3a1a;border-color:#4ade80;color:#4ade80;}
+.streak-day.current{background:#2a1800;border-color:#ff9900;color:#ff9900;}
+.streak-day.locked{opacity:0.35;cursor:default;}
+.streak-day.has-reward{box-shadow:0 0 10px #f5c54288;}
+.streak-day-icon{font-size:20px;line-height:1;}
+.streak-day-num{font-family:'Press Start 2P',monospace;font-size:6px;}
+
+/* АНИМАЦИЯ ОГНЯ */
+@keyframes fire-flicker {
+  0% { text-shadow: 0 0 3px #ff4400, 0 0 8px #ff6600; transform: scale(1); }
+  25% { text-shadow: 0 0 5px #ff6600, 0 0 12px #ff9900; transform: scale(1.05); }
+  50% { text-shadow: 0 0 3px #ff4400, 0 0 10px #ff8800; transform: scale(1); }
+  75% { text-shadow: 0 0 6px #ff5500, 0 0 14px #ffaa00; transform: scale(1.08); }
+  100% { text-shadow: 0 0 3px #ff4400, 0 0 8px #ff6600; transform: scale(1); }
+}
+.streak-fire {
+  font-size: 36px;
+  display: inline-block;
+  animation: fire-flicker 0.6s infinite ease-in-out;
+  filter: drop-shadow(0 0 6px #ff6600);
+}
+.streak-fire.gray {
+  animation: none;
+  filter: grayscale(1) brightness(0.5);
+  text-shadow: none;
+  opacity: 0.5;
+}
+.streak-num {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  color: #ff9900;
+  text-shadow: 0 0 8px #ff6600;
+}
+.streak-num.gray {
+  color: #666;
+  text-shadow: none;
+}
+.streak-box {
+  background: #1a1a28;
+  border: 2px solid #ff9900;
+  border-radius: 10px;
+  padding: 12px 15px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+.streak-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  color: #888;
+}
+.quest-card {
+  background: #1a1a28;
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.quest-card.done {
+  border-color: var(--green);
+}
+.quest-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  color: var(--accent);
+}
+.quest-desc {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+}
+.quest-progress {
+  height: 8px;
+  background: #222;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.quest-fill {
+  height: 100%;
+  background: var(--green);
+  transition: width 0.4s;
+}
+.flag-info {
+  background: #1a1a28;
+  border: 2px solid #ff9900;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* ПЛАВАЮЩАЯ КНОПКА АКТИВНОСТЕЙ */
+#activityfloatbtn {
+  position: fixed !important;
+  bottom: 120px !important;
+  right: 16px !important;
+  z-index: 2500 !important;
+  transition: all 0.2s;
+}
+#activityfloatbtn:hover {
+  background: #ff9900 !important;
+  color: #000 !important;
+  box-shadow: 0 0 20px #ff9900;
+}
+
+
+/* NOTIFY/TOOLTIP */
+#notify{position:fixed;top:12%;left:50%;transform:translateX(-50%);background:var(--accent);color:#000;font-family:'Press Start 2P',monospace;font-size:8px;padding:10px 16px;border-radius:7px;z-index:9998;display:none;text-align:center;line-height:2;box-shadow:0 0 28px var(--accent);max-width:85vw;word-break:break-word;}
+#tip{position:absolute;background:rgba(10,10,20,.96);border:1px solid var(--accent);padding:2px 7px;font-size:12px;pointer-events:none;display:none;z-index:999;border-radius:3px;color:var(--accent);white-space:nowrap;}
+
+/* ========== НОВЫЕ СТИЛИ v1.3 ========== */
+
+/* Алмазы в топбаре */
+#gemsdisplay .v { color: #9b59b6; }
+
+/* Кнопка ящиков */
+#casesbtn {
+  position: fixed;
+  top: 136px;
+  right: 8px;
+  background: rgba(10,10,20,.92);
+  border: 2px solid #f5c542;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  color: #f5c542;
+  z-index: 2000;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+#casesbtn:hover {
+  background: #f5c542;
+  color: #000;
+}
+
+/* Модальное окно ящиков */
+#casesModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.9);
+  z-index: 10002;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.cases-container {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+}
+.case-item {
+  background: #12121a;
+  border: 3px solid #2a2a3a;
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s;
+  min-width: 100px;
+}
+.case-item:hover { transform: scale(1.05); }
+.case-item.common { border-color: #7f8c8d; }
+.case-item.rare { border-color: #3498db; }
+.case-item.legendary { border-color: #f1c40f; }
+.case-item.disabled {
+  opacity: 0.3;
+  filter: grayscale(1);
+  cursor: not-allowed;
+}
+.case-icon { font-size: 48px; margin-bottom: 10px; }
+.case-name {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  margin-bottom: 5px;
+}
+.case-count {
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  color: #f5c542;
+}
+
+/* Анимация открытия ящика */
+#caseOpeningModal{position:fixed;inset:0;background:rgba(0,0,0,0.96);z-index:10003;display:none;flex-direction:column;align-items:center;justify-content:center;padding:16px;overflow-y:auto;}
+.opening-box{text-align:center;width:min(380px,96vw);}
+.opening-icon{font-size:72px;display:block;animation:shake 0.5s infinite;}
+@keyframes shake{0%,100%{transform:rotate(0deg);}25%{transform:rotate(-12deg);}75%{transform:rotate(12deg);}}
+.opening-text{font-family:'Press Start 2P',monospace;font-size:9px;color:#f5c542;margin:14px 0;line-height:2;}
+#dropContainer{display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto;padding:4px 2px;-webkit-overflow-scrolling:touch;}
+.drop-item{background:#1a1a28;border:2px solid #f5c542;border-radius:10px;padding:12px 16px;font-size:16px;animation:dropIn 0.35s;text-align:left;display:flex;align-items:center;gap:12px;}
+.drop-item .di{font-size:26px;flex-shrink:0;}
+.drop-item .dt{font-family:'VT323',monospace;font-size:17px;color:var(--text);}
+@keyframes dropIn{from{transform:scale(0) translateY(10px);opacity:0;}to{transform:scale(1) translateY(0);opacity:1;}}
+.opening-tap{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--dim);margin-top:10px;animation:blink 1s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.3;}}
+
+
+/* Меню пинов */
+#pinsMenu {
+  position: fixed;
+  bottom: 60px;
+  left: 10px;
+  background: #12121a;
+  border: 2px solid #f5c542;
+  border-radius: 10px;
+  padding: 10px;
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 9999;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.pin-item {
+  padding: 8px 12px;
+  background: #1a1a28;
+  border: 1px solid #2a2a3a;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+}
+.pin-item:hover { background: #2a2a3a; }
+.pin-item .pin-locked { color: #888; font-size: 10px; margin-left: 10px; }
+
+/* Кнопка пинов в чате */
+#pinbtn {
+  background: #1a1a28;
+  border: 1px solid #f5c542;
+  color: #f5c542;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+#pinbtn:hover { background: #f5c542; color: #000; }
+
+/* Лента дней */
+.streak-lenta {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding: 5px;
+  margin-bottom: 10px;
+}
+.streak-day {
+  min-width: 40px;
+  height: 40px;
+  background: #1a1a28;
+  border: 2px solid #2a2a3a;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-family: 'VT323', monospace;
+}
+.streak-day.done {
+  background: #4ade80;
+  border-color: #4ade80;
+  color: #000;
+}
+.streak-day.current {
+  background: #ff9900;
+  border-color: #ff9900;
+  color: #000;
+}
+.streak-day.locked { opacity: 0.3; }
+.streak-day-icon { font-size: 12px; }
+
+/* Таймер сброса */
+#resetTimer {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  color: #ff9900;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+/* Кнопка спасения серии */
+#saveStreakBtn {
+  background: #ff9900;
+  border: none;
+  color: #000;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6px;
+  padding: 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 5px;
+}
+#saveStreakBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Ивент-баннер */
+#eventBanner {
+  position: fixed;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ff9900;
+  color: #000;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  z-index: 3000;
+  display: none;
+  text-align: center;
+  box-shadow: 0 0 20px #ff9900;
+}
+
+</style>
+</head>
+<body>
+
+<!-- MAINTENANCE -->
+<div id="maint">
+  <div class="mtext">⚙️ PIXEL BATTLE<br><br>ТЕХНИЧЕСКИЕ РАБОТЫ</div>
+  <div class="mspin"></div>
+  <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--dim);text-align:center;">Скоро вернёмся!</div>
+</div>
+
+<!-- BROADCAST -->
+<div id="bcast" onclick="this.style.display='none'"><span id="btxt"></span> · нажми закрыть</div>
+
+<!-- WIPE TIMER -->
+<div id="wipetimer">⏳ ДО ВАЙПА<br><span id="wipetime">--:--:--</span></div>
+<div id="casesbtn" onclick="openCasesModal()">
+  <span>📦</span> ЯЩИКИ
+</div>
+<div id="onlinecounter"><span>🟢</span> <span id="onlinecount">0</span> онлайн</div>
+<div id="offlinebadge">⚡ ОФЛАЙН БУСТ<br><span id="offlinetime">--:--</span></div>
+
+<!-- ACTIVITY FLOAT BUTTON -->
+<div id="activityfloatbtn" onclick="togglePanel('actpanel','activityfloatbtn');loadActivityPanel();" style="position:fixed;bottom:120px;right:16px;background:rgba(10,10,20,.95);border:2px solid #ff9900;border-radius:8px;padding:8px 12px;font-family:'Press Start 2P',monospace;font-size:7px;color:#ff9900;z-index:2500;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 0 15px rgba(255,153,0,0.3);">
+  🎯 АКТИВНОСТИ
+</div>
+
+<!-- LOGIN -->
+<div id="lscreen">
+  <div class="lbox">
+    <div class="llogo">💡 PIXEL<br>BATTLE v1.2</div>
+    <input class="inp" id="ln" placeholder="Ник" maxlength="16" type="text" autocomplete="off"/>
+    <input class="inp" id="lp" placeholder="Пароль" maxlength="32" type="password"/>
+    <button class="lbtn" onclick="doLogin()">ВОЙТИ / РЕГИСТРАЦИЯ</button>
+    <div id="lerr"></div>
+    <div class="lhint">Новый ник = новый аккаунт</div>
+  </div>
+</div>
+
+<!-- UPDATE PANEL -->
+<div id="updatepanel" style="position:fixed;inset:0;background:#0a0a0f;z-index:10001;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#12121a;border:3px solid #f5c542;border-radius:16px;padding:25px;max-width:500px;width:90%;text-align:center;">
+    <div style="font-family:'Press Start 2P',monospace;font-size:14px;color:#f5c542;margin-bottom:15px;">💡 PIXEL BATTLE</div>
+    <div id="updateVersion" style="font-family:'Press Start 2P',monospace;font-size:10px;color:#4ade80;margin-bottom:20px;">v1.2</div>
+    <div id="updateTitle" style="font-family:'Press Start 2P',monospace;font-size:8px;color:#fff;margin-bottom:15px;line-height:2;">ОБНОВЛЕНИЕ</div>
+    <div id="updateText" style="background:#1a1a28;border:1px solid #2a2a3a;border-radius:8px;padding:15px;font-size:14px;color:#e0e0f0;line-height:1.8;max-height:300px;overflow-y:auto;white-space:pre-wrap;text-align:left;margin-bottom:20px;">Загрузка...</div>
+    <div style="font-size:12px;color:#888;margin-bottom:20px;">Хорошей игры!<br>rtyrt123e@gmail.com</div>
+    <button onclick="closeUpdatePanel()" style="background:#f5c542;border:none;color:#000;font-family:'Press Start 2P',monospace;font-size:8px;padding:12px 25px;border-radius:6px;cursor:pointer;width:100%;">ПРОДОЛЖИТЬ</button>
+  </div>
+</div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo">💡PB v1.2</div>
+  <div class="st" style="cursor:pointer;" onclick="openProfile()"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;"></span>&nbsp;<span class="v" id="sn">—</span></div>
+  <div class="st">Ур.<span class="v" id="sl">1</span></div>
+  <div class="st">💡<span class="v" id="sb">0</span></div>
+  <div class="st">🎨<span class="v" id="si">15</span>/<span class="v" id="sm">15</span><div id="rbar"><div id="rfill"></div></div></div>
+  <div class="st" id="gemsdisplay">💎<span class="v" id="sgems">0</span></div>
+  <div class="st">XP<span class="v" id="sx">0</span>/<span id="sxm">100</span></div>
+  <div id="mbtn" onclick="toggleMusic()"><span id="mico">🎵</span><span style="font-size:11px;color:var(--dim);">S26</span></div>
+  <div onclick="logout()" style="margin-left:auto;cursor:pointer;font-size:14px;padding:0 6px;flex-shrink:0;">🚪</div>
+</div>
+
+<!-- MAP -->
+<div id="eventBanner"></div>
+<div id="map"><div id="zhint">🔍 Приблизь карту<br>чтобы рисовать!</div></div>
+<div id="tip"></div>
+
+<!-- AUDIO -->
+<audio id="bgm" loop preload="none"><source src="music.mp3" type="audio/mpeg"/></audio>
+
+<!-- CHAT -->
+<div class="panel" id="cpanel">
+  <div id="ctabs">
+    <button class="ctab on" id="tg" onclick="swtab('g')">🌍 ОБЩИЙ</button>
+    <button class="ctab" id="tc" onclick="swtab('c')">👥 КЛАН</button>
+  </div>
+  <div id="cmsgs"></div>
+  <div id="cirow">
+    <button id="pinbtn" onclick="togglePinsMenu()">😊</button>
+<input id="cinp" placeholder="Нажми чтобы писать..." maxlength="120" type="text" autocomplete="off" oninput="this.value = this.value.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{1F1E0}-\u{1F1FF}]/gu, '')"/>
+    <button id="csend" onclick="sendChat()">OK</button>
+  </div>
+</div>
+
+
+<!-- SHOP -->
+<div class="panel" id="spanel">
+  <div class="ptit">🏪 МАГАЗИН <span class="pcls" onclick="closeAll()">✕</span></div>
+  <div class="pbody">
+    <!-- КРАСКИ -->
+    <div class="sect">🎨 КРАСКИ</div>
+    <div class="sitem">
+      <div class="si">+10 красок<small>Мгновенно</small></div>
+      <span class="prc" id="shop-ink-prc">💡100 <span class="sale-badge" id="sale-ink">СКИДКА</span></span>
+      <button class="bb" onclick="buy('i')">КУПИТЬ</button>
+    </div>
+
+    <!-- ЗАПАС КРАСОК -->
+    <div class="sect">🎒 ЗАПАС КРАСОК</div>
+    <div class="sitem">
+      <div class="si">+1 к лимиту<small id="inklimit-cur">Текущий: —</small></div>
+      <span class="prc" id="inklimit-p0">💡35</span>
+      <button class="bb" onclick="buyInkLimit(0)">КУПИТЬ</button>
+    </div>
+    <div class="sitem">
+      <div class="si">+5 к лимиту<small>Выгоднее!</small></div>
+      <span class="prc" id="inklimit-p1">💡100</span>
+      <button class="bb" onclick="buyInkLimit(1)">КУПИТЬ</button>
+    </div>
+    <div class="sitem">
+      <div class="si">+10 к лимиту<small>Максимум!</small></div>
+      <span class="prc" id="inklimit-p2">💡345</span>
+      <button class="bb" onclick="buyInkLimit(2)">КУПИТЬ</button>
+    </div>
+
+    <!-- ПРИВАТ -->
+    <div class="sect">🔒 ПРИВАТ</div>
+    <div class="sitem">
+      <div class="si">15 мин<small>~5км · 3 чел</small></div>
+      <span class="prc" id="pp1">💡500 <span class="sale-badge" id="sale-p1">СКИДКА</span></span>
+      <button class="bb" onclick="buy('p1')">КУПИТЬ</button>
+    </div>
+    <div class="sitem">
+      <div class="si">30 мин<small>~15км · 7 чел</small></div>
+      <span class="prc" id="pp2">💡1500 <span class="sale-badge" id="sale-p2">СКИДКА</span></span>
+      <button class="bb" onclick="buy('p2')">КУПИТЬ</button>
+    </div>
+
+    <!-- ПИНЫ -->
+    <div class="sect">📌 ПИНЫ</div>
+    <div class="sitem" id="pin-unlock-check" style="display:none;">
+      <div class="si">✅ Рисование «Галочка»<small>Нужно: исп. 15 раз</small></div>
+      <span class="prc">💡250</span>
+      <button class="bb" onclick="unlockPinDrawing('check')">КУПИТЬ</button>
+    </div>
+    <div class="sitem" id="pin-unlock-banana" style="display:none;">
+      <div class="si">🍌 Рисование «Банан»<small>Нужно: исп. 15 раз</small></div>
+      <span class="prc">💡250</span>
+      <button class="bb" onclick="unlockPinDrawing('banana')">КУПИТЬ</button>
+    </div>
+    <div class="sitem" id="pin-unlock-clown" style="display:none;">
+      <div class="si">👎🤡 Рисование «Клоун»<small>Нужно: исп. 15 раз</small></div>
+      <span class="prc">💡250</span>
+      <button class="bb" onclick="unlockPinDrawing('clown')">КУПИТЬ</button>
+    </div>
+    <div class="sitem">
+      <div class="si">📌 Пины в чате<small>Используй пины 15 раз → разблокируй рисование</small></div>
+      <button class="bb" onclick="togglePanel('cpanel','chatbtn')">ЧАТЬ</button>
+    </div>
+
+    <!-- 💎 АЛМАЗЫ -->
+    <div class="sect">💎 АЛМАЗЫ</div>
+    <div class="sitem">
+      <div class="si">💎 Пополнить алмазы<small>Через Telegram</small></div>
+      <button class="bb" onclick="buyGems()">💬 НАПИСАТЬ</button>
+    </div>
+
+    <!-- 🎁 ЯЩИКИ -->
+    <div class="sect">🎁 ЯЩИКИ</div>
+    <div class="sitem">
+      <div class="si">🎯 Обычный ящик</div>
+      <span class="prc">5💎</span>
+      <button class="bb" onclick="buyCase('common')">КУПИТЬ</button>
+    </div>
+    <div class="sitem">
+      <div class="si">💡 Средний ящик</div>
+      <span class="prc">20💎</span>
+      <button class="bb" onclick="buyCase('rare')">КУПИТЬ</button>
+    </div>
+    <div class="sitem">
+      <div class="si">👑 Легендарный ящик</div>
+      <span class="prc">50💎</span>
+      <button class="bb" onclick="buyCase('legendary')">КУПИТЬ</button>
+    </div>
+    <div class="sitem">
+      <div class="si">🐔 Петушиный кейс<small>Редкие дропы!</small></div>
+      <span class="prc">200💎</span>
+      <button class="bb" onclick="buyRoosterCase()">КУПИТЬ</button>
+    </div>
+
+    <!-- ОФЛАЙН БУСТ -->
+    <div class="sect" id="offshop-sect" style="display:none;">⚡ ОФЛАЙН БУСТ <small style="color:var(--dim);font-size:10px;">(с 3 уровня)</small></div>
+    <div class="sitem" id="offshop-30" style="display:none;">
+      <div class="si">⚡ 30 минут офлайн<small>Краска копится 30 мин</small></div>
+      <span class="prc" id="off1p">💡500 <span class="sale-badge" id="sale-off1">СКИДКА</span></span>
+      <button class="bb" onclick="buy('off30')">КУПИТЬ</button>
+    </div>
+    <div class="sitem" id="offshop-60" style="display:none;">
+      <div class="si">⚡ 1 час офлайн<small>Краска копится 1 час</small></div>
+      <span class="prc" id="off2p">💡1000 <span class="sale-badge" id="sale-off2">СКИДКА</span></span>
+      <button class="bb" onclick="buy('off60')">КУПИТЬ</button>
+    </div>
+    <div class="sitem" id="offshop-120" style="display:none;">
+      <div class="si">⚡ 2 часа офлайн<small>Краска копится 2 часа</small></div>
+      <span class="prc" id="off3p">💡1500 <span class="sale-badge" id="sale-off3">СКИДКА</span></span>
+      <button class="bb" onclick="buy('off120')">КУПИТЬ</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLAN -->
+<div class="panel" id="clpanel">
+  <div class="ptit">👥 КЛАНЫ <span class="pcls" onclick="closeAll()">✕</span></div>
+  <div class="pbody" id="clinner"></div>
+</div>
+
+<!-- ACTIVITY PANEL -->
+<div class="panel" id="actpanel">
+  <div class="ptit">🎯 АКТИВНОСТИ <span class="pcls" onclick="closeAll()">✕</span></div>
+  <div class="pbody" id="actbody">
+    <div style="color:var(--dim);font-size:13px;text-align:center;padding:10px;">Загрузка...</div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div class="panel" id="admpanel" style="height:420px;">
+  <div class="ptit" style="color:var(--red);">👑 АДМИН-ПАНЕЛЬ <span class="pcls" onclick="closeAll()">✕</span></div>
+  <div class="pbody" id="admbody">
+    <div style="color:var(--dim);font-size:13px;text-align:center;padding:10px;">Введи пароль администратора</div>
+    <div style="display:flex;flex-direction:column;gap:6px;padding:4px;">
+      <input class="ai" id="adm-pass-inp" placeholder="Пароль админа" type="password"/>
+      <button class="bb" onclick="unlockAdmin()" style="font-size:7px;padding:8px;">ВОЙТИ КАК АДМИН</button>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM BAR -->
+<div id="bottombar">
+  <div id="palwrap">
+    <div id="palette"></div>
+    <div id="paltog" onclick="togglePal()">▼</div>
+  </div>
+  <div id="sep"></div>
+  <button class="abtn" id="pbtn" onclick="togglePaint()">PAINT<br><span id="pctr">15/15</span></button>
+  <button class="abtn" id="dbtn" onclick="toggleDrag()">🔒DRAG</button>
+  <button class="abtn" id="flagbtn" onclick="toggleFlagMode()">🚩FLAG</button>
+  <button class="abtn" id="okbtn" onclick="confirmPx()">✓ОК</button>
+  <button class="abtn" id="cancbtn" onclick="cancelPx()">✗</button>
+  <div style="width:1px;height:30px;background:var(--border);flex-shrink:0;"></div>
+  <button class="ibtn" id="chatbtn" onclick="togglePanel('cpanel','chatbtn')">💬</button>
+  <button class="ibtn" id="clanbtn" onclick="togglePanel('clpanel','clanbtn');loadClan()">👥</button>
+  <button class="ibtn" id="shopbtn" onclick="togglePanel('spanel','shopbtn');renderShop()">🏪</button>
+  <button class="ibtn" id="admibtn" onclick="togglePanel('admpanel','admibtn');loadAdminPanel()">👑</button>
+</div>
+<!-- МОДАЛЬНОЕ ОКНО ЯЩИКОВ -->
+<div id="casesModal" onclick="if(event.target===this)this.style.display='none'">
+  <div class="cases-inner">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent);">📦 МОИ ЯЩИКИ</div>
+      <span style="cursor:pointer;color:var(--red);font-size:20px;" onclick="play('open');document.getElementById('casesModal').style.display='none'">✕</span>
+    </div>
+    <div class="cases-grid">
+      <div class="case-item common" onclick="openCaseWithQty('common')">
+        <span class="case-icon">🎯</span>
+        <div class="case-name">ОБЫЧНЫЙ</div>
+        <div class="case-count" id="commonCount">0</div>
+        <div class="case-qty-row">
+          <button class="case-qty-btn" onclick="event.stopPropagation();adjQty('common',-1)">-</button>
+          <input class="case-qty-input" id="qty-common" value="1" type="number" min="1" onclick="event.stopPropagation()">
+          <button class="case-qty-btn" onclick="event.stopPropagation();adjQty('common',1)">+</button>
+        </div>
+        <button class="case-open-btn">ОТКРЫТЬ</button>
+      </div>
+      <div class="case-item rare" onclick="openCaseWithQty('rare')">
+        <span class="case-icon">💡</span>
+        <div class="case-name">СРЕДНИЙ</div>
+        <div class="case-count" id="rareCount">0</div>
+        <div class="case-qty-row">
+          <button class="case-qty-btn" onclick="event.stopPropagation();adjQty('rare',-1)">-</button>
+          <input class="case-qty-input" id="qty-rare" value="1" type="number" min="1" onclick="event.stopPropagation()">
+          <button class="case-qty-btn" onclick="event.stopPropagation();adjQty('rare',1)">+</button>
+        </div>
+        <button class="case-open-btn">ОТКРЫТЬ</button>
+      </div>
+      <div class="case-item legendary" onclick="openCaseWithQty('legendary')">
+        <span class="case-icon">👑</span>
+        <div class="case-name">ЛЕГЕНДАРНЫЙ</div>
+        <div class="case-count" id="legendaryCount">0</div>
+        <div class="case-qty-row">
+          <button class="case-qty-btn" onclick="event.stopPropagation();adjQty('legendary',-1)">-</button>
+          <input class="case-qty-input" id="qty-legendary" value="1" type="number" min="1" onclick="event.stopPropagation()">
+          <button class="case-qty-btn" onclick="event.stopPropagation();adjQty('legendary',1)">+</button>
+        </div>
+        <button class="case-open-btn">ОТКРЫТЬ</button>
+      </div>
+      <div class="case-item rooster-type" onclick="openCaseWithQty('rooster')">
+        <span class="case-icon">🐔</span>
+        <div class="case-name" style="color:#ff8800;">ПЕТУХ</div>
+        <div class="case-count" id="roosterCount">0</div>
+        <div class="case-qty-row">
+          <button class="case-qty-btn" onclick="event.stopPropagation();adjQty('rooster',-1)">-</button>
+          <input class="case-qty-input" id="qty-rooster" value="1" type="number" min="1" onclick="event.stopPropagation()">
+          <button class="case-qty-btn" onclick="event.stopPropagation();adjQty('rooster',1)">+</button>
+        </div>
+        <button class="case-open-btn">ОТКРЫТЬ</button>
+      </div>
+    </div>
+    <button class="bb" onclick="play('open');document.getElementById('casesModal').style.display='none'" style="padding:10px;font-size:7px;">ЗАКРЫТЬ</button>
+  </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО ОТКРЫТИЯ ЯЩИКА -->
+<div id="caseOpeningModal" onclick="if(dropIndex>=currentDrops.length){play('open');this.style.display='none';}">
+  <div class="opening-box">
+    <span class="opening-icon" id="openingIcon">🎁</span>
+    <div class="opening-text" id="openingText">ОТКРЫВАЕМ...</div>
+    <div id="dropContainer"></div>
+  </div>
+</div>
+<div id="notify"></div>
+
+<script>
+const ADMIN_NICK='qwe', ADMIN_PASS='123456wwe';
+firebase.initializeApp({databaseURL:"https://pixel-battle-fb897-default-rtdb.firebaseio.com"});
+const db=firebase.database();
+
+const snd_pay_src = "data:audio/mpeg;base64,//tQxAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAAEEwBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAgICAgICAgICAgICAgICAgICAgICAgICAgMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD///////////////////////////////8AAAA5TEFNRTMuOTcgAaUAAAAALGoAABRAJAYbQgAAQAAABBNKziI+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/7UMQAAAmxUV4UAoABkCiyNwUAA/+T////Oc76EIc7///185znPIQhznkDgcFFDgcFCEIRjhwOChG1OHA4RlOc7zh8PgcPi6BwAwDD4uehA4Hw+Ln5A4Bw+5BAUDEQAgc5TAYDAYDAYDAYDAYDAQAQP4wTw4jz7edRLn8hpeN/8lCKKJMfv/HPJQyJ8bf/83LRFDIZUPyIH//lkOWDdlEXQc0Z0WeXf//xYgvaJ+D8wuEC8xTBqCrD5wR////lAcozqQ7NWpWXZnhjVmcZIAX/+1LEBIALpNth/IGACW6m6vwwj1FRzddZVkssaFa+OwxHGanGkOHasZeSqVMEev/9VT2PtXZvzO5Z/l1tcqomshtqVIVKMWN1llwJNCpfMoWvcndcoRGhRNEFYmnbOa9S39i+C8/zdv4r1EiBE0yWEpPkZsKinhuI5FbCYhR3MtB/4/SVVciWbVaW4TiOs/9bCq5mqapEcRmzLAKGpSk39/+HyrrcwjZTiDqUDGJNsSYrvN8+v35MEDtQc7dcl3UV95r/XRI2AA44G7FQz0iShv/7UsQGAEt1RT9imHcBRaWlIAMM+YrjBUWFWM9pnI60uPdgZKs1itfHNnM8TOTjf//55Z6lnOeSTbU9pwkNdXoluFUlUmdaueXGmf9VSVROqgmWFzFBWpGKASQKRrFWlQr2gr9YAAnM7OxISNp503N9VX/avP0F0jjQMBBljcNSZc1ja/GZmZsKJjaxlPqgIDAICDCgwqhRJd2FMBCqX/sexdL/aNt6r1WYMBeFpBQHCoiZIKmxAgoIHKCBhI5HcyZrP+yWGv8QSMiMDX/CRkIJ//tSxA2DyRjUrgGE1MAAADSAAAAEGxZRZRxZR8XGszxs0aUWW0nGnAYEBgYEWYeZYJizcXFTLuAhYXZwZCojDLpkWUxBTUUzLjk3VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=";
+const snd_pixel_src = "data:audio/mpeg;base64,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";
+const snd_ok_src = "data:audio/mpeg;base64,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+/gud21ar8q3Li5V77V+//tSxEgDSxjzEg9xpMEvmaKF7ZyY4gDQrf/7dQeu/yP/////9jzC1id6AEygARhc4gAow4GIyqp065Fc7pBMdyAYEJiPy04KsNP6mhSt+SkJf+aKrejVTlW5Z199/5hQaGl//VtUHr9j+v/////RRySiUNBcaF2q6LeGEcUGMnzHj4yAAoN9kRpxR0UqgSCcXv99UXp5Qv/kL+eyq3U3QEQny3+vycRhCo//qyaA3e7zv////9O5eOYAVHagGsr6RtMFccQwU1DjB/BgMleziH3/+1LEU4JJWM8Uzu1EgRwZogndqJgzMHBoCjq30t69n/O/sJv+I3yrbe/LjNv/+Fhee//26jVv//v/////////7f6Xmn7sis2eXOiCKS25AqCduZkDFRx0JxguORIhAQCT1o0R+GLUL9+YJnXnne/gS3fK0/L6hVJr//8oRFX/9G6DV/1/8r////+8u5dkcEBIDIoCIYqAH+dVQcwGYMwXqs4eAgz2HNpgyZsSMLVO++2MI8nGAv6j1Hf4BfX/flf//zBQKR//+gG////////////7UsRogkltnw4vbOTJKJ5hmZ6oYP/630fyvpcyrEkFzi5AgwdDhIRp4XeMKEZMMMFMSBnMmsDbH0DE72MBSAprE8Z15Qn+pnzfBaze+3+7//+omJu///Uq3//1/////7f//9NXezeyMfPNc80kYxIsyETB6sImsg9CMbXU6yHzMyxMTj4OEzSW9SiEJoZNNZTrzg9/zbf49/1/xCl/9fyguV//T5b+n/t/////+/2+v7suzu5VWqcxZD1KGqahpc0cIjw1E5CUeYYDXwI9AdjB//tSxHuDSY2jCi7spME4tGFJ3ZyYhodcJ5v5EKdXgixny3Hxd+h////b+Olv//lC1//T0Er////t/////2o9VMv6M6mO1TkkT1Uw8sPkySDgjExWIo1gHigJAANFS0wiujD/OMhig1wl0kHflcYX+VxT140n8y/8v7/p4xv//UYf//6r//+rf///T/+umrd7WR9H5hVXNKVSCOApXFDgAHnIAQuADcbwjocYwGSNoADr0iBj6gUS/9FLf6v/jb6Ud+j85lX//oX//v7f///v////+1LEjANKJaMGDHDiwTu0YISeHCD/pr+tm/R1nodpsYrIxU40wkpVzB8dEgXKUFgZ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";
+const snd_open_src = "data:audio/mpeg;base64,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h1TEOMhTeIA08u4m9A88l8pppw1F2UcTj2oaN8eGedM3XMTe6LEpEBqWYUmUNTQaFE614RrEFLf8zKcJ3P/7mGSoiEMYNUJIZh6AaecYNQzDlg21BwQDDFxBWplh5BGKaOo/RNUMLwwXxPJhRPBajl504GSmxeZOZ5goqZFgECA+XrZ/HRfz7KjPuiy7nX7kEFbPPe0s1YrA/sT9TST0nwAqLECgAAWaqra2Z8zOVW/+Z/nDsYkFaaAr/hQETD+hSAgI1WlDqrts2uzHsbNzCgQrX/9VVelRvUqCQCgVklbtVkMaY3N/MhjaGdSlKUxjG0eYxnUv/KVCspWl9vqZ1KyGoVqG6mfzB43KgqExglOrGFeVcCsSgqWPRFkJ9yQCCiVfsDT5k0FAIBAKTz5k0iROJa8rXLXlB9YqKit/8Nc/rqut87M3/7MHQLg+qLWmta4FgbA2D4OgbX6qsM3Nfquy8N6qrcN/81tqqrfqv7fKkqs113w3/sULNqzNf8rw2zfHw2tKv+zX37MzN7MzR+rMzepKs3//8rXKqUc2IAq2EhgaciMuRl9hIzJp+X/+ZGZNf/EZEaaEoYGFBOhlkbWcVgYKOhkysDBxyMv2v6tZHIyZZQccj/z/1YGCjoZMrKFjofY5l5qwMECeLypo00q4tna9zc2TjSij4vNmjTSnh2dj7i8SIkhIEBCzE1LmjTSj4tiyj7zcoiSEgQEeQTUlJxppR4GAKLH/7ZWsqOhHZZyqywGCdHZWssdJ//////2WWWxZZUMUFDAwQMIHRLLLDJQwUEDBBwjmX//LLLLP/////VQwUMDBB0c1ayyxlYGCBo6Eyyyy2WWVHP/7mETtgMPLcL/Iwy1AgxEXsATIPlEaIqBAjNzJ6b9NiACMof//2VrLHSf/5KGCggYIOEeyyyoYoBDBQQMIHCI/6tAxKoMrpppMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqg==";
+const snd_buy_src = "data:audio/mpeg;base64,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qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/7mGQAD/AAAGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAABExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqTEFNRTMuMTAwqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/7mGQAD/AAAGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAABExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqTEFNRTMuMTAwqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/7mGQAD/AAAGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAABExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqTEFNRTMuMTAwqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/7mGQAD/AAAGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAABExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqTEFNRTMuMTAwqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/7mGQAD/AAAGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAABExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqTEFNRTMuMTAwqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqg==";
+
+// ── SOUND ENGINE ──────────────────────────────────────────────────────
+const SND = {};
+function _mkSnd(key, src, vol=0.6){
+  const a = new Audio(src);
+  a.volume = vol;
+  SND[key] = a;
+}
+let _soundsReady = false;
+function initSounds(){
+  if(_soundsReady) return;
+  _soundsReady = true;
+  _mkSnd('pay',   snd_pay_src,   0.55); // нажатие на меню / оплата
+  _mkSnd('pixel', snd_pixel_src, 0.5);  // рисование пикселя
+  _mkSnd('ok',    snd_ok_src,    0.55); // ок / отмена / confirm
+  _mkSnd('open',  snd_open_src,  0.45); // открыть / закрыть окно
+  _mkSnd('buy',   snd_buy_src,   0.65); // покупка / новый уровень
+}
+function play(key){
+  if(!_soundsReady) return;
+  try{
+    const a = SND[key];
+    if(!a) return;
+    a.currentTime = 0;
+    a.play().catch(()=>{});
+  } catch(e){}
+}
+// init on first touch/click
+document.addEventListener('click', initSounds, {once:true});
+document.addEventListener('touchstart', initSounds, {once:true});
+
+
+const COLORS=[
+  '#ff0000','#ff8800','#ffff00','#00cc00','#00cccc','#0000ff','#cc00cc','#ffffff',
+  '#ff6666','#ffaa44','#aaff44','#44ffcc','#44aaff','#aa44ff','#ff44aa','#aaaaaa',
+  '#880000','#884400','#448800','#006644','#004488','#440088','#880044','#444444',
+  '#ffcccc','#ffeecc','#ccffcc','#ccffee','#cceeff','#eeccff','#ffccee','#111111',
+  '#ff3300','#ff6600','#ff9900','#ffcc00','#ccff00','#99ff00','#00ff66','#00ffcc',
+  '#00ffff','#00ccff','#0099ff','#0066ff','#3300ff','#6600ff','#9900ff','#cc00ff',
+  '#ff00cc','#ff0066','#990000','#994400','#999900','#009900','#009999','#000099',
+  '#990099','#664422','#446622','#224466','#662244','#ffddbb','#bbffdd','#bbddff',
+  '#222222','#555555','#777777','#999999','#bbbbbb','#dddddd','#ff8866','#66ff88',
+  '#8866ff','#ff6688','#ffaa88','#88ffaa','#aa88ff','#ffaa00','#00ffaa','#aa00ff',
+  '#dd2200','#00dd22','#2200dd','#ddaa00','#00ddaa','#aa00dd','#552200','#005522',
+  '#220055','#225500','#002255','#554400','#005544','#440055','#ff77aa','#77ffaa',
+  '#aa77ff','#ffaa77','#aaffaa','#aaaaff','#ffaaaa','#aaffff','#ffeeaa','#aaffee',
+  '#bb5500','#00bb55','#5500bb','#bb0055','#55bb00','#0055bb','#bbaa00','#00bbaa',
+  '#aa00bb','#bb00aa','#aabb00','#00aabb','#331100','#003311','#110033','#330011'
+];
+
+// XP нужно для следующего уровня (v1.2: уровни до 15)
+function xpNeeded(lvl){
+  if(lvl<=3)return 100;
+  if(lvl<=5)return 250;
+  if(lvl<=10)return 300;
+  return 400; // 10-15
+}
+
+// Сколько цветов открыто на уровне
+function colorsForLevel(lvl){
+  if(lvl>=15)return COLORS.length; // 128
+  if(lvl>=14)return 64;
+  // до 14 уровня — базовые 8 + 1 каждый уровень начиная с 1
+  return Math.min(8+(lvl-1), 64);
+}
+
+// Время флага по уровню
+function flagDuration(lvl){
+  if(lvl>=11)return 3*60*60*1000;
+  if(lvl>=8)return 2*60*60*1000;
+  if(lvl>=6)return 60*60*1000;
+  return 30*60*1000; // уровень 5
+}
+
+let bannedPlayers={};
+let P=null,pm=false,dm=false,flagMode=false,drag=false,ghosts=[],col='#ff0000';
+let privBuys=[0,0],rp=0,ctab='g',palExp=false,isAdmin=false;
+let currentDrops = [];
+let dropIndex = 0;
+const pxL={},pxD={},pvL=[];let pvZ=[];
+let heatmapActive=false,heatmapMarkers=[],wipeInterval=null;
+let dthrot=0,lastDragPos=null;
+let activeSale={};
+let offlineBstInterval=null;
+const flagMarkers=[];
+
+// ══ MUSIC ══
+let mplay=false;
+const bgm=document.getElementById('bgm');
+function toggleMusic(){
+  if(mplay){bgm.pause();mplay=false;document.getElementById('mico').textContent='🎵';}
+  else{bgm.play().then(()=>{mplay=true;document.getElementById('mico').textContent='⏸️';}).catch(()=>notify('Нажми ещё раз!'));}
+}
+
+// ══ SESSION ══
+function saveSession(nick,pass){
+  localStorage.setItem('pixelBattleSession',JSON.stringify({nick,pass,expires:Date.now()+7*24*60*60*1000}));
+}
+function loadSession(){
+  try{const d=localStorage.getItem('pixelBattleSession');if(!d)return null;const s=JSON.parse(d);if(Date.now()>s.expires){localStorage.removeItem('pixelBattleSession');return null;}return s;}catch(e){return null;}
+}
+function clearSession(){localStorage.removeItem('pixelBattleSession');}
+async function autoLogin(){
+  const s=loadSession();if(!s)return;
+  document.getElementById('ln').value=s.nick;
+  document.getElementById('lp').value=s.pass;
+  await doLogin(true);
+}
+function logout(){
+  clearSession();P=null;
+  document.getElementById('lscreen').style.display='flex';
+  document.getElementById('ln').value='';document.getElementById('lp').value='';
+  ghosts.forEach(g=>map.removeLayer(g.r));ghosts=[];closeAll();notify('👋 Вы вышли из аккаунта');
+}
+
+// ══ PALETTE — сетка ══
+function togglePal(){
+  palExp=!palExp;
+  document.getElementById('palette').classList.toggle('exp',palExp);
+  document.getElementById('paltog').textContent=palExp?'▲':'▼';
+}
+function buildPal(){
+  const pal=document.getElementById('palette');pal.innerHTML='';
+
+  // Ластик — первый слот когда PAINT включён
+  if(pm){
+    const er=document.createElement('div');
+    er.className='clr'+(col==='__erase__'?' on':'');
+    er.style.cssText='background:linear-gradient(135deg,#fff 45%,#f00 45%,#f00 55%,#fff 55%);font-size:11px;font-weight:bold;color:#f00;display:flex;align-items:center;justify-content:center;border-color:#ccc;';
+    er.textContent='✕';er.title='Ластик — удалить свой пиксель';
+    er.onclick=()=>{col='__erase__';buildPal();notify('✕ Ластик: кликни на свой пиксель');};
+    pal.appendChild(er);
+  }
+
+  const ul=P.colors.length;
+  const show=Math.min(ul+2,COLORS.length);
+  COLORS.slice(0,show).forEach((c,i)=>{
+    const b=document.createElement('div');
+    const lk=i>=ul;
+    const r=parseInt(c.substring(1,3),16),g=parseInt(c.substring(3,5),16),bv=parseInt(c.substring(5,7),16);
+    const dark=(r+g+bv)<80;
+    b.className='clr'+(lk?' lk':'')+(c===col&&!lk?' on':'')+(dark?' dark':'');
+    b.style.background=c;
+    b.title=lk?'🔒 Открывается позже':c;
+    if(!lk)b.onclick=()=>{col=c;activePinType=null;buildPal();play('pay');};
+    pal.appendChild(b);
+  });
+
+  // Пины в палитре если разблокированы
+  if(P&&P.unlockedPins&&P.unlockedPins.length>0){
+    const icons={check:'✅',banana:'🍌',clown:'🤡',rooster:'🐔'};
+    P.unlockedPins.forEach(pin=>{
+      const pc=PIN_COLORS&&PIN_COLORS[pin]||'#aaa';
+      const b=document.createElement('div');
+      b.className='clr'+(activePinType===pin?' on':'');
+      b.style.cssText='background:'+pc+';font-size:14px;display:flex;align-items:center;justify-content:center;';
+      b.textContent=icons[pin]||'📌';
+      b.title='Рисование пина '+getPinName(pin)+' (раз в 5 мин)';
+      b.onclick=()=>{togglePinPaint(pin);};
+      pal.appendChild(b);
+    });
+  }
+}
+
+// ══ LOGIN ══
+function lerr(m){document.getElementById('lerr').textContent=m;}
+async function doLogin(isAuto=false){
+  const nick=document.getElementById('ln').value.trim();
+  const pass=document.getElementById('lp').value.trim();
+  if(!nick||!pass){if(!isAuto)lerr('Введи ник и пароль!');return;}
+  if(nick.length<2){if(!isAuto)lerr('Ник мин. 2 символа!');return;}
+  if(/[.#$\/\[\]]/.test(nick)){if(!isAuto)lerr('Недопустимые символы!');return;}
+  const banSnap=await db.ref('banned/'+nick).once('value');
+  if(banSnap.exists()){
+    const b=banSnap.val();
+    if(b.expires>Date.now()){lerr('⛔ Забанен до '+new Date(b.expires).toLocaleString());return;}
+    else await db.ref('banned/'+nick).remove();
+  }
+  const ref=db.ref('players/'+nick);
+  const snap=await ref.once('value');
+  if(snap.exists()){
+    const d=snap.val();
+    if(d.pass!==pass){if(!isAuto)lerr('Неверный пароль!');clearSession();return;}
+    P=d;
+    if(P.lastSave){const aw=Math.floor((Date.now()-P.lastSave)/1000);P.ink=Math.min(P.inkMax,P.ink+Math.floor(aw/30));}
+  } else {
+    P={nick,pass,level:1,xp:0,ink:15,inkMax:15,bulbs:0,
+       colors:COLORS.slice(0,8),privBuys:[0,0],privCosts:[500,1500],
+       offCosts:[500,1000,1500],clan:'',lastSave:Date.now(),
+       streak:0,lastQuestDate:'',questDone:false,flagAvailable:false,flagLastGiven:0};
+    await ref.set(P);
+    pChat(null,'🆕 '+nick+' вошёл в игру!','sys','');
+    const vSnap=await db.ref('config/version').once('value');
+    if(!vSnap.exists())await db.ref('config/version').set('1.2');
+  }
+  // Ensure new fields exist for old players
+  if(!P.offCosts)P.offCosts=[500,1000,1500];
+  if(!P.streak)P.streak=0;
+  if(P.lastQuestDate===undefined)P.lastQuestDate='';
+  if(P.questDone===undefined)P.questDone=false;
+  if(P.flagAvailable===undefined)P.flagAvailable=false;
+  if(!P.flagLastGiven)P.flagLastGiven=0;
+
+  saveSession(nick,pass);
+  privBuys=P.privBuys||[0,0];
+  isAdmin=(nick===ADMIN_NICK&&pass===ADMIN_PASS);
+  document.getElementById('lscreen').style.display='none';
+  setTimeout(()=>checkUpdatePanel(),500);
+  initUI();startRestore();listenPx();listenChat();listenPv();
+  listenMaint();listenBcast();listenBans();listenVersion();listenSale();listenFlags();listenEvents();
+  pingOnline();setInterval(pingOnline,25000);
+  startWipeTimer();
+  updateOnlineCounter();setInterval(updateOnlineCounter,30000);
+   initNewFields();
+    checkDailyQuest();
+  checkOfflineBoost();
+}
+async function saveP(){
+  if(!P)return;P.lastSave=Date.now();
+  db.ref('players/'+P.nick).update({
+    level:P.level,xp:P.xp,ink:P.ink,inkMax:P.inkMax,bulbs:P.bulbs,
+    colors:P.colors,privBuys,privCosts:P.privCosts||[500,1500],
+    offCosts:P.offCosts||[500,1000,1500],clan:P.clan||'',lastSave:P.lastSave,
+    streak:P.streak||0,lastQuestDate:P.lastQuestDate||'',
+    questDone:P.questDone||false,questProgress:P.questProgress||0,
+    flagAvailable:P.flagAvailable||false,flagLastGiven:P.flagLastGiven||0,
+    gems:P.gems||0,cases:P.cases||{common:0,rare:0,legendary:0},
+    pins:P.pins||[],pinUsage:P.pinUsage||{},titles:P.titles||[],
+    unlockedPins:P.unlockedPins||[],savedStreak:P.savedStreak||false,
+    inkLimitPrices:P.inkLimitPrices||[35,100,345],
+    offlineBoostExpires:P.offlineBoostExpires||0
+  });
+}
+function pingOnline(){
+  if(!P)return;
+  const r=db.ref('online/'+P.nick);
+  r.set({nick:P.nick,t:Date.now(),clan:P.clan||'',lat:map.getCenter().lat,lng:map.getCenter().lng});
+  r.onDisconnect().remove();
+}
+
+// ══ UI ══
+function initUI(){updS();buildPal();renderShop();}
+function updS(){
+  if(!P)return;
+  const tag=P.clan?'['+P.clan+'] ':'';
+  document.getElementById('sn').textContent=tag+P.nick;
+  document.getElementById('sl').textContent=P.level;
+  document.getElementById('sb').textContent=P.bulbs;
+  
+document.getElementById('sgems').textContent = P.gems || 0;
+ document.getElementById('si').textContent=P.ink;
+  document.getElementById('sm').textContent=P.inkMax;
+  document.getElementById('pctr').textContent=P.ink+'/'+P.inkMax;
+  document.getElementById('sx').textContent=P.xp;
+  document.getElementById('sxm').textContent=xpNeeded(P.level);
+  const c=P.privCosts||[500,1500];
+  document.getElementById('pp1').textContent='💡'+c[0];
+  document.getElementById('pp2').textContent='💡'+c[1];
+  // Флаг — показываем кнопку с 5 уровня
+  document.getElementById('flagbtn').style.display=P.level>=5?'inline-block':'none';
+  if(P.flagAvailable) document.getElementById('flagbtn').classList.add('active');
+  else document.getElementById('flagbtn').classList.remove('active');
+}
+
+// ══ MAP ══
+const MZ=7;
+const map=L.map('map',{center:[30,20],zoom:3,zoomControl:true,attributionControl:false,doubleClickZoom:false,maxBounds:[[-85,-200],[85,200]],maxBoundsViscosity:0.9,tap:true});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19,minZoom:2,opacity:0.92}).addTo(map);
+
+const CELL_SIZE=0.00025;
+function pd(){return{la:CELL_SIZE,ln:CELL_SIZE};}
+function snap(ll){return{lat:Math.round(ll.lat/CELL_SIZE)*CELL_SIZE,lng:Math.round(ll.lng/CELL_SIZE)*CELL_SIZE};}
+function pk(lat,lng){return(lat>=0?'N':'S')+Math.abs(lat).toFixed(5).replace('.','x')+'_'+(lng>=0?'E':'W')+Math.abs(lng).toFixed(5).replace('.','x');}
+function chkZ(){document.getElementById('zhint').style.display=map.getZoom()<MZ?'block':'none';}
+map.on('zoomend',chkZ);chkZ();
+
+// ══ PAINT ══
+map.on('click',function(e){
+  if(flagMode){placeFlag(e.latlng);return;}
+  if(!pm||dm)return;
+  placeG(e.latlng);
+});
+function placeG(ll){
+  if(map.getZoom()<MZ){notify('🔍 Приблизь карту!');return;}
+  const sn=snap(ll);const k=pk(sn.lat,sn.lng);
+
+  // ЛАСТИК
+  if(col==='__erase__'){
+    if(!pxD[k]){notify('❌ Здесь нет пикселя!');return;}
+    if(pxD[k].nick!==P.nick){notify('❌ Нельзя удалить чужой пиксель!');return;}
+    db.ref('pixels/'+k).remove();
+    notify('✓ Пиксель удалён!');play('ok');return;
+  }
+
+  // Кулдаун пина
+  if(activePinType){
+    const now=Date.now();
+    if(now-lastPinPlace<5*60*1000){
+      const sec=Math.ceil((5*60*1000-(now-lastPinPlace))/1000);
+      notify('⏳ Пин: ещё '+sec+' сек');return;
+    }
+    lastPinPlace=now;
+  }
+
+  const ei=ghosts.findIndex(g=>g.k===k);
+  if(ei!==-1){map.removeLayer(ghosts[ei].r);ghosts[ei]={k,lat:sn.lat,lng:sn.lng,color:col,r:mkGR(sn)};return;}
+  if(pxD[k]){
+    if(pxD[k].nick===P.nick&&pxD[k].color===col){notify('⚠️ У вас уже стоит такой цвет!');return;}
+  }
+  if(P.ink<=0){notify('❌ Нет красок!');return;}
+  P.ink--;ghosts.push({k,lat:sn.lat,lng:sn.lng,color:col,r:mkGR(sn)});play('pixel');updS();
+}
+function mkGR(sn){
+  const s=pd();
+  return L.rectangle([[sn.lat-s.la/2,sn.lng-s.ln/2],[sn.lat+s.la/2,sn.lng+s.ln/2]],
+    {color:col,fillColor:col,fillOpacity:0.42,weight:1,opacity:0.6,dashArray:'4,3'}).addTo(map);
+}
+
+// ══ DRAG ══
+map.on('mousedown',e=>{if(pm&&dm){drag=true;lastDragPos=snap(e.latlng);placeG(e.latlng);}});
+map.on('mousemove',e=>{
+  if(!drag||!pm||!dm)return;
+  const n=Date.now();if(n-dthrot<50)return;dthrot=n;
+  const cs=snap(e.latlng);
+  if(lastDragPos&&lastDragPos.lat===cs.lat&&lastDragPos.lng===cs.lng)return;
+  lastDragPos=cs;placeG(e.latlng);
+});
+map.on('mouseup',()=>{drag=false;lastDragPos=null;});
+const mc=map.getContainer();
+mc.addEventListener('touchstart',e=>{
+  if(flagMode){
+    const t=e.touches[0];const tb=document.getElementById('topbar').offsetHeight;
+    placeFlag(map.containerPointToLatLng(L.point(t.clientX,t.clientY-tb)));return;
+  }
+  if(!pm||!dm)return;drag=true;
+  const t=e.touches[0];const tb=document.getElementById('topbar').offsetHeight;
+  const ll=map.containerPointToLatLng(L.point(t.clientX,t.clientY-tb));
+  lastDragPos=snap(ll);placeG(ll);
+},{passive:true});
+mc.addEventListener('touchmove',e=>{
+  if(!drag||!pm||!dm)return;
+  const n=Date.now();if(n-dthrot<80)return;dthrot=n;
+  const t=e.touches[0];const tb=document.getElementById('topbar').offsetHeight;
+  const ll=map.containerPointToLatLng(L.point(t.clientX,t.clientY-tb));
+  const cs=snap(ll);
+  if(lastDragPos&&lastDragPos.lat===cs.lat&&lastDragPos.lng===cs.lng)return;
+  lastDragPos=cs;placeG(ll);
+},{passive:true});
+mc.addEventListener('touchend',()=>{drag=false;lastDragPos=null;},{passive:true});
+
+function togglePaint(){
+  if(!P)return;pm=!pm;
+  if(!pm){dm=false;document.getElementById('dbtn').classList.remove('on');if(col==='__erase__')col='#ff0000';activePinType=null;}
+  document.getElementById('pbtn').classList.toggle('on',pm);
+  document.getElementById('dbtn').style.display=pm?'inline-block':'none';
+  document.getElementById('okbtn').style.display=pm?'inline-block':'none';
+  document.getElementById('cancbtn').style.display=pm?'inline-block':'none';
+  if(pm){map.dragging.disable();map.scrollWheelZoom.disable();}
+  else{map.dragging.enable();map.scrollWheelZoom.enable();}
+  play('pay');
+  buildPal();
+}
+function toggleDrag(){
+  if(!pm){notify('Сначала включи PAINT!');return;}
+  dm=!dm;document.getElementById('dbtn').classList.toggle('on',dm);
+}
+function confirmPx(){ play('ok');
+  if(!ghosts.length){togglePaint();return;}
+  const up={};let bl=0;
+  ghosts.forEach(g=>{
+    if(isPvBlk(g.lat,g.lng)){bl++;map.removeLayer(g.r);P.ink++;return;}
+    up['pixels/'+g.k]={lat:g.lat,lng:g.lng,color:g.color,nick:P.nick,clan:P.clan||'',t:Date.now()};
+  });
+  if(Object.keys(up).length)db.ref().update(up);
+  const cnt=Object.keys(up).length;
+  if(cnt){
+    const bppTable=[5,5,6,7,7,8,8,9,10,12,13,14,15,16,18];
+    const bpp=bppTable[Math.min(P.level-1,14)]||18;
+    P.bulbs+=cnt*bpp;P.xp+=cnt;
+    chkLvl();
+    pChat(null,P.nick+' +'+cnt+'пкс (+'+cnt*bpp+'💡)','sys','');
+    // Прогресс квеста
+    updateQuestProgress(cnt);
+  }
+  if(bl)notify('❌ '+bl+' заблокировано приватом!');
+  ghosts=[];saveP();updS();dm=false;document.getElementById('dbtn').classList.remove('on');togglePaint();
+}
+function cancelPx(){ play('ok');ghosts.forEach(g=>{map.removeLayer(g.r);P.ink++;});ghosts=[];updS();dm=false;document.getElementById('dbtn').classList.remove('on');togglePaint();}
+
+// ══ PIXELS ══
+function listenPx(){
+  db.ref('pixels').once('value',s=>{const a=s.val()||{};Object.entries(a).forEach(([k,p])=>{pxD[k]=p;if(map.getZoom()>=MZ)drwPx(k,p);});});
+  db.ref('pixels').on('child_added',s=>{const k=s.key,p=s.val();if(!pxD[k]){pxD[k]=p;if(map.getZoom()>=MZ)drwPx(k,p);}});
+  db.ref('pixels').on('child_changed',s=>{const k=s.key,p=s.val();pxD[k]=p;if(map.getZoom()>=MZ)drwPx(k,p);});
+  db.ref('pixels').on('child_removed',s=>{const k=s.key;delete pxD[k];if(pxL[k]){map.removeLayer(pxL[k]);delete pxL[k];}});
+}
+function drwPx(k,p){
+  if(pxL[k])map.removeLayer(pxL[k]);
+  const s=pd();
+  const r=L.rectangle([[p.lat-s.la/2,p.lng-s.ln/2],[p.lat+s.la/2,p.lng+s.ln/2]],
+    {color:p.color,fillColor:p.color,fillOpacity:0.93,weight:0.1}).addTo(map);
+  pxL[k]=r;
+  r.on('click',e=>{if(pm||flagMode)return;tipAt(e.originalEvent.clientX,e.originalEvent.clientY,'👤 '+(p.clan?'['+p.clan+'] ':'')+p.nick);setTimeout(hideTip,2500);});
+}
+map.on('zoomend',()=>{
+  const z=map.getZoom();
+  Object.keys(pxL).forEach(k=>{map.removeLayer(pxL[k]);delete pxL[k];});
+  if(z>=MZ)Object.entries(pxD).forEach(([k,p])=>drwPx(k,p));
+  rdPv();
+});
+
+// ══ LEVEL UP (v1.2: до 15 уровней) ══
+function chkLvl(){
+  const need=xpNeeded(P.level);
+  if(P.xp>=need&&P.level<15){
+    P.xp-=need;P.level++;P.inkMax+=5;P.ink=Math.min(P.ink+2,P.inkMax);
+    const newColors=colorsForLevel(P.level);
+    if(P.colors.length<newColors)P.colors=COLORS.slice(0,newColors);
+    const msg=P.level>=15?'🎨 ВСЕ ЦВЕТА!':P.level>=14?'🎨 64 ЦВЕТА!':'+5 краски +1 цвет';
+    notify('🎉 УР.'+P.level+'!\n'+msg); play('buy');
+    buildPal();renderShop();chkLvl();
+  }
+}
+
+// ══ RESTORE + ОФЛАЙН БУСТ ══
+function startRestore(){
+  setInterval(()=>{
+    if(!P)return;
+    // Обычное восстановление
+    rp+=100/30;
+    document.getElementById('rfill').style.width=Math.min(rp,100)+'%';
+    if(rp>=100){
+      rp=0;
+      if(P.ink<P.inkMax){
+        P.ink++;
+        // С 3 уровня офлайн начисление (+1 краска в офлайн каждые 30 сек — работает через lastSave при следующем входе)
+        saveP();updS();
+      }
+    }
+  },1000);
+}
+
+// ══ ОФЛАЙН БУСТ ══
+function checkOfflineBoost(){
+  if(!P)return;
+  const boost=P.offlineBoostExpires||0;
+  if(boost>Date.now()){
+    showOfflineBadge(boost);
+  } else {
+    document.getElementById('offlinebadge').style.display='none';
+    if(offlineBstInterval){clearInterval(offlineBstInterval);offlineBstInterval=null;}
+  }
+}
+function showOfflineBadge(expireAt){
+  const badge=document.getElementById('offlinebadge');
+  badge.style.display='flex';
+  if(offlineBstInterval)clearInterval(offlineBstInterval);
+  offlineBstInterval=setInterval(()=>{
+    const diff=expireAt-Date.now();
+    if(diff<=0){badge.style.display='none';clearInterval(offlineBstInterval);return;}
+    const m=Math.floor(diff/60000),s=Math.floor((diff%60000)/1000);
+    document.getElementById('offlinetime').textContent=m+':'+(s<10?'0':'')+s;
+  },1000);
+}
+
+// ══ CHAT ══
+function listenChat(){db.ref('chat').limitToLast(60).on('value',s=>{if(ctab==='g')rndrM(Object.values(s.val()||{}));});}
+function swtab(t){
+  ctab=t;
+  document.getElementById('tg').classList.toggle('on',t==='g');
+  document.getElementById('tc').classList.toggle('on',t==='c');
+  if(t==='g'){db.ref('chat').limitToLast(60).once('value',s=>rndrM(Object.values(s.val()||{})));}
+  else{
+    if(!P||!P.clan){rndrM([{type:'sys',txt:'Ты не в клане!',t:0}]);return;}
+    db.ref('clan_chat/'+P.clan).limitToLast(60).on('value',s=>{if(ctab==='c')rndrM(Object.values(s.val()||{}));});
+  }
+}
+function rndrM(arr){
+  arr.sort((a,b)=>a.t-b.t);
+  const c=document.getElementById('cmsgs');c.innerHTML='';
+  arr.forEach(m=>{
+    const d=document.createElement('div');
+    if(m.type==='sys'){d.className='msys';d.textContent=m.txt;}
+    else{
+      d.className='musr';
+      const tg=m.clan?'<b style="color:var(--blue)">['+m.clan+']</b> ':'';
+      const tit=m.title?'<span style="margin-right:3px;font-size:14px;">'+esc(m.title)+'</span>':'';
+      if(m.type==='pin'){
+        d.innerHTML=tit+tg+'<span class="nick">'+esc(m.nick)+':</span> <span class="msg-pin">'+esc(m.txt)+'</span>';
+      } else {
+        d.innerHTML=tit+tg+'<span class="nick">'+esc(m.nick)+':</span> <span class="txt">'+esc(m.txt)+'</span>';
+      }
+    }
+    c.appendChild(d);
+  });
+  c.scrollTop=c.scrollHeight;
+}
+function esc(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function pChat(n,t,type,clan,title=''){db.ref('chat').push({nick:n,txt:t,type,clan:clan||'',title:title||'',t:Date.now()});}
+function sendChat(){
+  const inp=document.getElementById('cinp');const t=inp.value.trim();if(!t||!P)return;
+  if(ctab==='g'){db.ref('chat').push({nick:P.nick,txt:t,type:'usr',clan:P.clan||'',title:P.activeTitle||'',t:Date.now()});}
+  else{if(!P.clan){notify('Вступи в клан!');return;}db.ref('clan_chat/'+P.clan).push({nick:P.nick,txt:t,type:'usr',clan:P.clan,title:P.activeTitle||'',t:Date.now()});}
+  inp.value='';inp.focus();
+}
+document.getElementById('cinp').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+
+// ══ SHOP ══
+function renderShop(){
+  if(!P)return;
+  const prices=P.inkLimitPrices||[35,100,345];
+  // Запас красок
+  const p0=document.getElementById('inklimit-p0');if(p0)p0.textContent='💡'+prices[0];
+  const p1=document.getElementById('inklimit-p1');if(p1)p1.textContent='💡'+prices[1];
+  const p2=document.getElementById('inklimit-p2');if(p2)p2.textContent='💡'+prices[2];
+  const cur=document.getElementById('inklimit-cur');if(cur)cur.textContent='Текущий: '+P.inkMax;
+  // Пины — показываем кнопку разблокировки если уже 15 использований
+  ['check','banana','clown'].forEach(pin=>{
+    const el=document.getElementById('pin-unlock-'+pin);
+    if(!el)return;
+    const usage=(P.pinUsage||{})[pin]||0;
+    const unlocked=(P.unlockedPins||[]).includes(pin);
+    el.style.display=(usage>=15&&!unlocked)?'flex':'none';
+  });
+  // Офлайн буст — с 3 уровня
+  const showOff=P.level>=3;
+  document.getElementById('offshop-sect').style.display=showOff?'':'none';
+  document.getElementById('offshop-30').style.display=showOff?'flex':'none';
+  document.getElementById('offshop-60').style.display=showOff?'flex':'none';
+  document.getElementById('offshop-120').style.display=showOff?'flex':'none';
+  const oc=P.offCosts||[500,1000,1500];
+  const off1=document.getElementById('off1p');if(off1)off1.childNodes[0].textContent='💡'+oc[0]+' ';
+  const off2=document.getElementById('off2p');if(off2)off2.childNodes[0].textContent='💡'+oc[1]+' ';
+  const off3=document.getElementById('off3p');if(off3)off3.childNodes[0].textContent='💡'+oc[2]+' ';
+  const c=P.privCosts||[500,1500];
+  const pp1=document.getElementById('pp1');if(pp1)pp1.childNodes[0].textContent='💡'+c[0]+' ';
+  const pp2=document.getElementById('pp2');if(pp2)pp2.childNodes[0].textContent='💡'+c[1]+' ';
+  updateSaleBadges();
+}
+function updateSaleBadges(){
+  const ids=['sale-ink','sale-p1','sale-p2','sale-off1','sale-off2','sale-off3'];
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.classList.toggle('show',!!(activeSale.active));
+  });
+}
+
+function buy(type){
+  if(!P)return;
+  const c=P.privCosts||[500,1500];
+  const oc=P.offCosts||[500,1000,1500];
+  const disc=activeSale.active?activeSale.discount||0:0;
+  const discounted=(price)=>Math.max(1,Math.round(price*(1-disc/100)));
+
+  if(type==='i'){
+    const cost=discounted(100);
+    if(P.bulbs<cost){notify('Нужно 💡'+cost+'!');return;}
+    P.bulbs-=cost;P.ink=Math.min(P.ink+10,P.inkMax);notify('🎨 +10 красок!');
+  } else if(type==='p1'){
+    const cost=discounted(c[0]);
+    if(P.bulbs<cost){notify('Нужно 💡'+cost+'!');return;}
+    P.bulbs-=cost;privBuys[0]++;
+    if(Math.random()<0.75)c[0]+=150;
+    P.privCosts=c;P.privBuys=privBuys;actPv(900,5000);notify('🔒 Приват 15 мин (5 км)!'); play('buy'); updateBonusProgress('priv',1);
+  } else if(type==='p2'){
+    const cost=discounted(c[1]);
+    if(P.bulbs<cost){notify('Нужно 💡'+cost+'!');return;}
+    P.bulbs-=cost;privBuys[1]++;
+    if(Math.random()<0.75)c[1]+=150;
+    P.privCosts=c;P.privBuys=privBuys;actPv(1800,15000);notify('🔒 Приват 30 мин (15 км)!'); play('buy'); updateBonusProgress('priv',1);
+  } else if(type==='off30'){
+    if(P.level<3){notify('🔒 С 3 уровня!');return;}
+    const cost=discounted(oc[0]);
+    if(P.bulbs<cost){notify('Нужно 💡'+cost+'!');return;}
+    P.bulbs-=cost;
+    if(Math.random()<0.6)oc[0]+=150;
+    P.offCosts=oc;
+    activateOfflineBoost(30*60*1000);notify('⚡ Офлайн буст 30 мин активирован!');
+  } else if(type==='off60'){
+    if(P.level<3){notify('🔒 С 3 уровня!');return;}
+    const cost=discounted(oc[1]);
+    if(P.bulbs<cost){notify('Нужно 💡'+cost+'!');return;}
+    P.bulbs-=cost;
+    if(Math.random()<0.6)oc[1]+=150;
+    P.offCosts=oc;
+    activateOfflineBoost(60*60*1000);notify('⚡ Офлайн буст 1 час активирован!');
+  } else if(type==='off120'){
+    if(P.level<3){notify('🔒 С 3 уровня!');return;}
+    const cost=discounted(oc[2]);
+    if(P.bulbs<cost){notify('Нужно 💡'+cost+'!');return;}
+    P.bulbs-=cost;
+    if(Math.random()<0.6)oc[2]+=150;
+    P.offCosts=oc;
+    activateOfflineBoost(120*60*1000);notify('⚡ Офлайн буст 2 часа активирован!');
+  }
+  saveP();updS();renderShop();
+}
+
+function activateOfflineBoost(durationMs){
+  const expAt=Date.now()+durationMs;
+  P.offlineBoostExpires=expAt;
+  showOfflineBadge(expAt);
+}
+
+// ══ SALE SYSTEM ══
+function listenSale(){
+  db.ref('config/sale').on('value',s=>{
+    activeSale=s.val()||{};
+    updateSaleBadges();
+    renderShop();
+  });
+}
+
+// ══ PRIVET ══
+function actPv(sec,rm){const c=map.getCenter();db.ref('privet').push({nick:P.nick,clan:P.clan||'',lat:c.lat,lng:c.lng,radiusM:rm,expireAt:Date.now()+sec*1000,t:Date.now()});}
+function listenPv(){
+  db.ref('privet').on('value',s=>{
+    const a=s.val()||{};pvZ=[];const now=Date.now();
+    Object.entries(a).forEach(([k,z])=>{if(z.expireAt<now){db.ref('privet/'+k).remove();return;}pvZ.push({...z,radiusM:z.radiusM||5000});});
+    rdPv();
+  });
+}
+function rdPv(){
+  pvL.forEach(l=>map.removeLayer(l));pvL.length=0;
+  const now=Date.now();
+  pvZ.forEach(z=>{
+    if(z.expireAt<now)return;
+    const mins=Math.ceil((z.expireAt-now)/60000);
+    const c=L.circle([z.lat,z.lng],{radius:z.radiusM,color:'#f5c542',fillColor:'#f5c542',fillOpacity:0.06,weight:2,dashArray:'8,5',opacity:0.8}).addTo(map);
+    c.bindTooltip('🔒 '+(z.clan?'['+z.clan+'] ':'')+z.nick+' · '+mins+'мин',{permanent:false,direction:'center'});
+    pvL.push(c);
+  });
+}
+function isPvBlk(lat,lng){
+  const now=Date.now();
+  for(const z of pvZ){
+    if(z.expireAt<now)continue;if(P.clan&&z.clan&&P.clan===z.clan)continue;if(z.nick===P.nick)continue;
+    const R=6371000,dLa=(lat-z.lat)*Math.PI/180,dLn=(lng-z.lng)*Math.PI/180;
+    const a=Math.sin(dLa/2)**2+Math.cos(z.lat*Math.PI/180)*Math.cos(lat*Math.PI/180)*Math.sin(dLn/2)**2;
+    if(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))<z.radiusM)return true;
+  }
+  return false;
+}
+
+// ══ FLAG SYSTEM (с 5 уровня) ══
+let flagModeActive=false;
+function toggleFlagMode(){
+  if(!P){return;}
+  if(P.level<5){notify('🔒 Флаг открывается на 5 уровне!');return;}
+  if(!P.flagAvailable){notify('🚩 Флаг недоступен. Следующий даётся завтра!');return;}
+  flagMode=!flagMode;
+  document.getElementById('flagbtn').classList.toggle('active',flagMode);
+  if(flagMode){
+    map.dragging.disable();map.scrollWheelZoom.disable();
+    notify('🚩 Тапни на карту чтобы поставить флаг!');
+  } else {
+    map.dragging.enable();map.scrollWheelZoom.enable();
+  }
+}
+function placeFlag(latlng){
+  if(!P||!flagMode||!P.flagAvailable)return;
+  const dur=flagDuration(P.level);
+  const expAt=Date.now()+dur;
+  const mins=Math.round(dur/60000);
+  db.ref('flags').push({nick:P.nick,clan:P.clan||'',lat:latlng.lat,lng:latlng.lng,expireAt:expAt,t:Date.now()});
+  P.flagAvailable=false;
+  saveP();updS();
+  flagMode=false;
+  document.getElementById('flagbtn').classList.remove('active');
+  map.dragging.enable();map.scrollWheelZoom.enable();
+  pChat(null,'🚩 '+P.nick+' поставил флаг активности на '+mins+' мин!','sys','');
+  notify('🚩 Флаг поставлен на '+mins+' минут!');
+}
+function listenFlags(){
+  db.ref('flags').on('value',s=>{
+    flagMarkers.forEach(m=>map.removeLayer(m));flagMarkers.length=0;
+    const all=s.val()||{};const now=Date.now();
+    Object.entries(all).forEach(([k,f])=>{
+      if(f.expireAt<now){db.ref('flags/'+k).remove();return;}
+      const mins=Math.ceil((f.expireAt-now)/60000);
+      const icon=L.divIcon({className:'',html:'<div style="font-size:22px;text-shadow:0 0 8px #ff9900;filter:drop-shadow(0 0 4px #ff9900);">🚩</div>',iconSize:[24,24],iconAnchor:[12,24]});
+      const m=L.marker([f.lat,f.lng],{icon}).addTo(map);
+      m.bindTooltip('🚩 '+(f.clan?'['+f.clan+'] ':'')+f.nick+' · '+mins+'мин',{permanent:false});
+      flagMarkers.push(m);
+    });
+  });
+}
+
+// ══ DAILY QUEST ══
+function todayKey(){const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+// checkDailyQuest и loadActivityPanel — v1.3 версии определены ниже
+function updateQuestProgress(pixelsPlaced){
+  if(!P||P.questDone)return;
+  P.questProgress=(P.questProgress||0)+pixelsPlaced;
+  if(P.questProgress>=3){
+    P.questDone=true;
+    const today=todayKey();
+    if(P.lastQuestDate===today)P.streak=(P.streak||0)+1;
+    saveP();updS();
+    notify('🎯 ЗАДАНИЕ ВЫПОЛНЕНО!\n🔥 Серия: '+P.streak+' дней!');
+    loadActivityPanel();
+  } else {
+    saveP();
+  }
+  // Доп. задание "поставь пиксели"
+  updateBonusProgress('place', pixelsPlaced);
+}
+
+// ══ CLANS ══
+async function loadClan(){
+  const inner=document.getElementById('clinner');inner.innerHTML='<div style="color:var(--dim);font-size:12px;">Загрузка...</div>';
+  db.ref('clans').once('value',s=>{
+    const cls=s.val()||{};inner.innerHTML='';
+    if(P.clan){
+      const cl=cls[P.clan];
+      if(cl){
+        const mc=Object.keys(cl.members||{}).length;
+        const isOwner=cl.owner===P.nick;const isOfficer=cl.officers&&cl.officers[P.nick];
+        inner.innerHTML=`<div class="sect">МОЙ КЛАН</div>
+          <div class="crow" style="flex-direction:column;align-items:flex-start;gap:3px;">
+            <div><span class="ctg" style="background:${cl.color||'#444'};color:#fff;">[${esc(P.clan)}]</span><b>${esc(cl.name)}</b></div>
+            <div style="font-size:11px;color:var(--dim);">${mc}/${cl.maxMembers||150} · 👑 ${esc(cl.owner)}</div>
+          </div>
+          ${isOwner||isOfficer?'<button class="cbtn" style="background:var(--blue);border-color:var(--blue);color:#000;margin-top:3px;" onclick="manageClanMembers()">👥 УЧАСТНИКИ</button>':''}
+          <button class="cbtn" style="background:var(--red);border-color:var(--red);color:#fff;margin-top:3px;" onclick="leaveClan()">🚪 ПОКИНУТЬ</button>
+          ${isOwner?'<button class="cbtn" style="background:#ff0000;border-color:#ff0000;color:#fff;margin-top:3px;" onclick="deleteMyClan()">🗑️ УДАЛИТЬ КЛАН</button>':''}`;
+        return;
+      }
+    }
+    inner.innerHTML=`<button class="cbtn" onclick="tcf()">+ СОЗДАТЬ КЛАН</button><div id="ccf" style="display:none;flex-direction:column;gap:5px;"><input class="ai" id="cnn" placeholder="Название" maxlength="24" type="text"/><input class="ai" id="cnt" placeholder="ТЕГ (2-5 букв)" maxlength="5" type="text"/><div style="display:flex;align-items:center;gap:5px;font-size:13px;">Цвет:<input type="color" id="cnc" value="#4ade80" style="width:40px;height:26px;border:none;border-radius:3px;cursor:pointer;"></div><button class="cbtn" onclick="createClan()">СОЗДАТЬ</button></div><div class="sect" style="margin-top:3px;">ВСЕ КЛАНЫ</div><div id="clist"></div>`;
+    const list=document.getElementById('clist');
+    const en=Object.entries(cls);
+    if(!en.length){list.innerHTML='<div style="color:var(--dim);font-size:12px;text-align:center;padding:5px;">Кланов нет!</div>';return;}
+    en.slice(0,30).forEach(([tag,cl])=>{
+      const mc=Object.keys(cl.members||{}).length;
+      const row=document.createElement('div');row.className='crow';
+      row.innerHTML=`<div><span class="ctg" style="background:${cl.color||'#444'};color:#fff;">[${esc(tag)}]</span><b>${esc(cl.name)}</b><div style="font-size:11px;color:var(--dim);">${mc}/${cl.maxMembers||150}·👑${esc(cl.owner)}</div></div><button class="jb" onclick="joinClan('${esc(tag)}')">ВСТУПИТЬ</button>`;
+      list.appendChild(row);
+    });
+  });
+}
+function manageClanMembers(){
+  if(!P.clan)return;
+  db.ref('clans/'+P.clan+'/members').once('value',s=>{
+    const members=s.val()||{};
+    let html='<div class="sect">УЧАСТНИКИ КЛАНА</div>';
+    Object.keys(members).forEach(nick=>{html+=`<div class="crow"><span>${esc(nick)}</span><button class="rb" style="font-size:5px;padding:3px;" onclick="kickFromClan('${esc(nick)}')">КИК</button></div>`;});
+    html+='<button class="cbtn" onclick="loadClan()">НАЗАД</button>';
+    document.getElementById('clinner').innerHTML=html;
+  });
+}
+async function kickFromClan(nick){
+  if(!P.clan)return;
+  const s=await db.ref('clans/'+P.clan).once('value');const cl=s.val();
+  if(cl.owner!==P.nick&&!(cl.officers&&cl.officers[P.nick])){notify('❌ Нет прав!');return;}
+  if(cl.owner===nick){notify('❌ Нельзя кикнуть создателя!');return;}
+  await db.ref('clans/'+P.clan+'/members/'+nick).remove();
+  await db.ref('players/'+nick).update({clan:''});
+  pChat(null,'👢 '+nick+' исключён из клана','sys','');
+  notify('✅ '+nick+' исключён');manageClanMembers();
+}
+function tcf(){const f=document.getElementById('ccf');if(f)f.style.display=f.style.display==='none'?'flex':'none';}
+async function createClan(){
+  const name=(document.getElementById('cnn')||{}).value?.trim();
+  const tag=(document.getElementById('cnt')||{}).value?.trim().toUpperCase();
+  const color=(document.getElementById('cnc')||{}).value;
+  if(!name||!tag||tag.length<2){notify('Введи название и тег!');return;}
+  const maxClansSnap=await db.ref('config/maxClans').once('value');
+  const maxClans=maxClansSnap.val()||50;
+  const clansSnap=await db.ref('clans').once('value');
+  if(clansSnap.numChildren()>=maxClans){notify('❌ Лимит кланов ('+maxClans+')!');return;}
+  const s=await db.ref('clans/'+tag).once('value');if(s.exists()){notify('Тег занят!');return;}
+  await db.ref('clans/'+tag).set({name,tag,color,owner:P.nick,members:{[P.nick]:true},officers:{},maxMembers:150,created:Date.now()});
+  P.clan=tag;saveP();pChat(null,'⚔️ '+P.nick+' создал ['+tag+']!','sys','');notify('⚔️ Клан создан!');loadClan();updS();
+}
+async function joinClan(tag){
+  const s=await db.ref('clans/'+tag).once('value');if(!s.exists()){notify('Не найден!');return;}
+  const cl=s.val();
+  if(Object.keys(cl.members||{}).length>=(cl.maxMembers||150)){notify('❌ Клан полон!');return;}
+  await db.ref('clans/'+tag+'/members/'+P.nick).set(true);
+  P.clan=tag;saveP();pChat(null,'➕ '+P.nick+' в ['+tag+']!','sys','');notify('✅ Добро пожаловать!');loadClan();updS();
+}
+async function leaveClan(){
+  if(!P.clan)return;const tag=P.clan;
+  const s=await db.ref('clans/'+tag).once('value');const cl=s.val();
+  if(cl.owner===P.nick){
+    if(!confirm('⚠️ Вы создатель! При выходе клан будет удалён.'))return;
+    await db.ref('clans/'+tag).remove();pChat(null,'⚔️ Клан ['+tag+'] расформирован','sys','');
+  } else {
+    await db.ref('clans/'+tag+'/members/'+P.nick).remove();pChat(null,'➖ '+P.nick+' покинул ['+tag+']','sys','');
+  }
+  P.clan='';saveP();notify('Покинул клан.');loadClan();updS();
+}
+async function deleteMyClan(){
+  if(!P.clan)return;if(!confirm('⚠️ Клан будет удалён навсегда!'))return;
+  const tag=P.clan;const s=await db.ref('clans/'+tag).once('value');const cl=s.val();
+  if(cl.owner!==P.nick){notify('❌ Только создатель!');return;}
+  await db.ref('clans/'+tag).remove();
+  const players=await db.ref('players').once('value');const updates={};
+  players.forEach(p=>{if(p.val().clan===tag)updates['players/'+p.key+'/clan']='';});
+  if(Object.keys(updates).length)await db.ref().update(updates);
+  P.clan='';saveP();notify('🗑️ Клан удалён!');pChat(null,'⚔️ Клан ['+tag+'] расформирован','sys','');loadClan();updS();
+}
+
+// ══ BAN SYSTEM ══
+function listenBans(){db.ref('banned').on('value',s=>{bannedPlayers=s.val()||{};});}
+async function banPlayer(nick,durationHours,reason){
+  if(!isAdmin){notify('❌ Нет прав!');return;}
+  const expires=Date.now()+durationHours*60*60*1000;
+  await db.ref('banned/'+nick).set({nick,expires,reason:reason||'',bannedBy:P.nick,bannedAt:Date.now()});
+  await db.ref('online/'+nick).remove();
+  pChat(null,'🔨 '+nick+' забанен на '+durationHours+'ч. Причина: '+(reason||'не указана'),'sys','');
+  notify('✅ '+nick+' забанен!');
+}
+
+// ══ WIPE TIMER ══
+async function startWipeTimer(){
+  if(wipeInterval)clearInterval(wipeInterval);
+  wipeInterval=setInterval(async()=>{
+    const s=await db.ref('config/wipeTime').once('value');
+    const wipeTime=s.val();const el=document.getElementById('wipetime');
+    if(!wipeTime){el.textContent='--:--:--';return;}
+    const diff=wipeTime-Date.now();
+    if(diff<=0){el.textContent='00:00:00';if(isAdmin)notify('⏰ Время вайпа!');return;}
+    const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),sec=Math.floor((diff%60000)/1000);
+    el.textContent=h.toString().padStart(2,'0')+':'+m.toString().padStart(2,'0')+':'+sec.toString().padStart(2,'0');
+  },1000);
+}
+async function updateOnlineCounter(){
+  const cut=Date.now()-2*60*1000;
+  const s=await db.ref('online').once('value');
+  const all=s.val()||{};
+  document.getElementById('onlinecount').textContent=Object.values(all).filter(u=>u.t>cut).length;
+}
+
+
+// ══ ADMIN ══
+function unlockAdmin(){
+  const pass=document.getElementById('adm-pass-inp').value.trim();
+  if(pass!==ADMIN_PASS){notify('❌ Неверный пароль!');play('pay');return;}
+  isAdmin=true;loadAdminPanel();
+}
+function loadAdminPanel(){
+  const body=document.getElementById('admbody');
+  if(!isAdmin){
+    body.innerHTML=`<div style="color:var(--dim);font-size:12px;text-align:center;padding:8px;">Введи пароль</div><div style="display:flex;flex-direction:column;gap:5px;padding:4px;"><input class="ai" id="adm-pass-inp" placeholder="Пароль админа" type="password"/><button class="bb" onclick="unlockAdmin()" style="font-size:7px;padding:7px;">ВОЙТИ КАК АДМИН</button></div>`;
+    return;
+  }
+  body.innerHTML=`
+    <!-- ОНЛАЙН -->
+    <div class="arow"><label>🟢 ОНЛАЙН</label><div id="onl" style="font-size:12px;color:var(--green);line-height:1.8;">...</div><button class="bb" onclick="loadOnline()" style="align-self:flex-start;font-size:6px;">ОБНОВИТЬ</button></div>
+    
+    <!-- СООБЩЕНИЕ ВСЕМ -->
+    <div class="arow"><label>📢 СООБЩЕНИЕ ВСЕМ</label><input class="ai" id="amsg" placeholder="Текст..." type="text"/><button class="bb" onclick="aBcast()" style="align-self:flex-start;">ОТПРАВИТЬ</button></div>
+    
+    <!-- ВЫДАТЬ ЛАМПОЧКИ -->
+    <div class="arow"><label>💡 ВЫДАТЬ ЛАМПОЧКИ</label><input class="ai" id="anb" placeholder="Ник" type="text"/><input class="ai" id="aamt" placeholder="Количество" type="number"/><button class="bb" onclick="aGiveBulbs()" style="align-self:flex-start;">ВЫДАТЬ</button></div>
+    
+    <!-- ВЫДАТЬ АЛМАЗЫ -->
+    <div class="arow"><label>💎 ВЫДАТЬ АЛМАЗЫ</label><input class="ai" id="agemsnick" placeholder="Ник" type="text"/><input class="ai" id="agemsamt" placeholder="Количество" type="number"/><button class="bb" onclick="aGiveGems()" style="align-self:flex-start;">ВЫДАТЬ</button></div>
+    
+    <!-- УРОВЕНЬ -->
+    <div class="arow"><label>⚡ УРОВЕНЬ (1-15)</label><input class="ai" id="anl" placeholder="Ник" type="text"/><input class="ai" id="alvl" placeholder="1–15" type="number" min="1" max="15"/><button class="bb" onclick="aSetLvl()" style="align-self:flex-start;">УСТАНОВИТЬ</button></div>
+    
+    <!-- ВЫДАТЬ ЯЩИКИ -->
+    <div class="arow"><label>🎁 ВЫДАТЬ ЯЩИКИ</label>
+      <input class="ai" id="acasenick" placeholder="Ник" type="text"/>
+      <select class="ai" id="acasetype" style="background:#0a0a0f;color:var(--text);">
+        <option value="common">🎯 Обычный</option>
+        <option value="rare">💡 Средний</option>
+        <option value="legendary">👑 Легендарный</option>
+      </select>
+      <input class="ai" id="acaseamt" placeholder="Количество" type="number" value="1"/>
+      <button class="bb" onclick="aGiveCase()">ВЫДАТЬ</button>
+    </div>
+    
+    <!-- ВЫДАТЬ ПИН -->
+    <div class="arow"><label>💬 ВЫДАТЬ ПИН</label>
+      <input class="ai" id="apinnick" placeholder="Ник" type="text"/>
+      <select class="ai" id="apintype" style="background:#0a0a0f;color:var(--text);">
+        <option value="check">✅ Галочка</option>
+        <option value="banana">🍌 Банан</option>
+        <option value="clown">👎🤡 Клоун</option>
+      </select>
+      <button class="bb" onclick="aGivePin()">ВЫДАТЬ</button>
+    </div>
+    
+    <!-- ВЫДАТЬ ФЛАГ -->
+    <div class="arow"><label>🚩 ВЫДАТЬ ФЛАГ</label><input class="ai" id="aflagn" placeholder="Ник" type="text"/><button class="bb" onclick="aGiveFlag()" style="align-self:flex-start;">ВЫДАТЬ ФЛАГ</button></div>
+    
+    <!-- СЕРИЯ ДНЕЙ -->
+    <div class="arow"><label>🔥 ВЫДАТЬ СЕРИЮ</label><input class="ai" id="astreaknick" placeholder="Ник" type="text"/><input class="ai" id="astreakdays" placeholder="Дней серии" type="number" value="1"/><button class="bb" onclick="aGiveStreak()">УСТАНОВИТЬ</button></div>
+    
+    <!-- АКЦИЯ (СКИДКА) -->
+    <div class="arow"><label>🔖 АКЦИЯ (СКИДКА %)</label>
+      <input class="ai" id="asaledisc" placeholder="Скидка %" type="number" value="20"/>
+      <input class="ai" id="asalehours" placeholder="Длительность (часов)" type="number" value="3"/>
+      <div style="display:flex;gap:5px;"><button class="bb" onclick="aStartSale()" style="flex:1;">▶ НАЧАТЬ</button><button class="rb" onclick="aEndSale()" style="flex:1;">■ СТОП</button></div>
+    </div>
+    
+    <!-- ЗАПУСК ИВЕНТА -->
+    <div class="arow"><label>⚡ ЗАПУСТИТЬ ИВЕНТ</label>
+      <select class="ai" id="aeventtype" style="background:#0a0a0f;color:var(--text);">
+        <option value="blackcube">⬛ Чёрный куб</option>
+        <option value="canvas">🎨 Полотно 150x150 (+2 XP)</option>
+        <option value="drops">☁️ Дропы с неба (5 мин)</option>
+        <option value="fast">⚡ Быстрые пиксели (без 💡)</option>
+        <option value="quest">🎁 50 пикселей = ящик</option>
+      </select>
+      <input class="ai" id="aeventduration" placeholder="Длительность (минут)" type="number" value="5"/>
+      <button class="bb" onclick="aStartEvent()">ЗАПУСТИТЬ</button>
+      <button class="rb" style="font-size:6px;padding:4px;margin-top:3px;" onclick="aStopEvent()">■ ОСТАНОВИТЬ</button>
+    </div>
+    
+    <!-- СМЕНИТЬ ПАРОЛЬ -->
+    <div class="arow"><label>🔐 СМЕНИТЬ ПАРОЛЬ</label><input class="ai" id="achangenick" placeholder="Ник" type="text"/><input class="ai" id="achangepass" placeholder="Новый пароль" type="text"/><button class="bb" onclick="aChangePass()">СМЕНИТЬ</button></div>
+    
+    <!-- ЗАБАНИТЬ -->
+    <div class="arow"><label>🔨 ЗАБАНИТЬ</label><input class="ai" id="abannick" placeholder="Ник" type="text"/><input class="ai" id="abanhours" placeholder="Часы" type="number" value="24"/><input class="ai" id="abanreason" placeholder="Причина" type="text"/><button class="rb" onclick="aBanPlayer()">ЗАБАНИТЬ</button></div>
+    
+    <!-- РАЗБАНИТЬ -->
+    <div class="arow"><label>✅ РАЗБАНИТЬ</label><input class="ai" id="aunbannick" placeholder="Ник" type="text"/><button class="bb" onclick="aUnbanPlayer()">РАЗБАНИТЬ</button></div>
+    
+    <!-- ВАЙП -->
+    <div class="arow"><label>⏳ ВАЙП ЧЕРЕЗ (часов)</label><input class="ai" id="awipetime" placeholder="Часы" type="number" value="24"/><button class="bb" onclick="aSetWipe()">УСТАНОВИТЬ</button></div>
+    
+    <!-- УДАЛИТЬ КЛАН -->
+    <div class="arow"><label>👥 УДАЛИТЬ КЛАН</label><input class="ai" id="aclanname" placeholder="Тег клана" type="text"/><button class="rb" style="font-size:7px;padding:7px;" onclick="aDeleteClan()">🗑️ УДАЛИТЬ</button></div>
+    
+    <!-- ЛИМИТЫ -->
+    <div class="arow"><label>⚙️ ЛИМИТЫ КЛАНОВ</label>
+      <div style="display:flex;gap:5px;"><input class="ai" id="amaxclans" placeholder="Макс. кланов" type="number" value="50"/><button class="bb" onclick="aSetMaxClans()">ОК</button></div>
+      <div style="display:flex;gap:5px;margin-top:3px;"><input class="ai" id="amaxmembers" placeholder="Макс. в клане" type="number" value="150"/><button class="bb" onclick="aSetMaxMembers()">ОК</button></div>
+    </div>
+    
+    <!-- ОЧИСТИТЬ ПИКСЕЛИ -->
+    <div class="arow"><label>🗑️ ОЧИСТИТЬ ПИКСЕЛИ</label><button class="rb" style="font-size:7px;padding:7px;" onclick="aClrPx()">⚠️ ОЧИСТИТЬ ВСЁ</button></div>
+    
+    <!-- ВЕРСИЯ -->
+    <div class="arow"><label>📌 ВЕРСИЯ ИГРЫ</label><input class="ai" id="aversion" placeholder="Версия" type="text" value="1.3"/><button class="bb" onclick="aSetVersion()">СМЕНИТЬ</button></div>
+    
+    <!-- ОБНОВЛЕНИЕ -->
+    <div class="arow"><label>📢 ОБНОВЛЕНИЕ</label>
+      <input class="ai" id="aupdversion" placeholder="Версия" type="text" value="1.3"/>
+      <input class="ai" id="aupdtitle" placeholder="Заголовок" type="text" value="ОБНОВЛЕНИЕ"/>
+      <textarea class="ai" id="aupdtext" placeholder="Текст обновления..." rows="3" style="resize:vertical;"></textarea>
+      <input class="ai" id="aupdtimes" placeholder="Сколько раз показать" type="number" value="1"/>
+      <input class="ai" id="aupdhours" placeholder="Часы между показами" type="number" value="0"/>
+      <button class="bb" onclick="aSetUpdate()">ОТПРАВИТЬ</button>
+      <button class="rb" style="font-size:6px;padding:4px;margin-top:3px;" onclick="aDisableUpdate()">🗑️ СКРЫТЬ</button>
+    </div>
+    
+    <!-- ТЕХ. РАБОТЫ -->
+    <div class="arow"><label>⚙️ ТЕХ. РАБОТЫ</label>
+      <div style="display:flex;gap:5px;"><button class="rb" style="font-size:7px;padding:7px;flex:1;" onclick="aMaint(true)">▶ ВКЛ</button><button class="blb" style="font-size:7px;padding:7px;flex:1;" onclick="aMaint(false)">■ ВЫКЛ</button></div>
+    </div>
+  `;
+  loadOnline();
+}
+// ══ UPDATE SYSTEM ══
+function closeUpdatePanel(){
+  document.getElementById('updatepanel').style.display='none';
+  var shown=JSON.parse(localStorage.getItem('pb_updates_shown')||'[]');
+  var updateId=localStorage.getItem('pb_update_id');
+  if(updateId){shown.push({id:updateId,time:Date.now()});localStorage.setItem('pb_updates_shown',JSON.stringify(shown));}
+}
+async function checkUpdatePanel(){
+  var s=await db.ref('config/update').once('value');var update=s.val();
+  if(!update||!update.active)return false;
+  var shown=JSON.parse(localStorage.getItem('pb_updates_shown')||'[]');
+  var thisUpdateShown=shown.filter(function(item){return item.id===update.id;}).length;
+  if(thisUpdateShown>=update.showTimes)return false;
+  if(update.hoursBetween>0){var lastShown=shown.filter(function(item){return item.id===update.id;}).sort(function(a,b){return b.time-a.time;})[0];if(lastShown&&Date.now()-lastShown.time<update.hoursBetween*60*60*1000)return false;}
+  document.getElementById('updateVersion').textContent='v'+(update.version||'1.2');
+  document.getElementById('updateTitle').textContent=update.title||'ОБНОВЛЕНИЕ';
+  document.getElementById('updateText').textContent=update.text||'Новая версия!';
+  document.getElementById('updatepanel').style.display='flex';
+  localStorage.setItem('pb_update_id',update.id);return true;
+}
+async function aSetUpdate(){
+  var version=document.getElementById('aupdversion').value.trim();var title=document.getElementById('aupdtitle').value.trim();var text=document.getElementById('aupdtext').value.trim();
+  var showTimes=parseInt(document.getElementById('aupdtimes').value)||1;var hoursBetween=parseInt(document.getElementById('aupdhours').value)||0;
+  if(!text){notify('Введи текст!');return;}
+  await db.ref('config/update').set({id:Date.now().toString(),version:version||'1.2',title:title||'ОБНОВЛЕНИЕ',text,showTimes,hoursBetween,active:true,createdAt:Date.now()});
+  notify('✅ Обновление отправлено!');pChat(null,'📢 Вышло новое обновление!','sys','');
+}
+async function aDisableUpdate(){await db.ref('config/update/active').set(false);notify('✅ Обновление скрыто!');}
+
+// ═══════════════════════════════════════════════════════════
+// ══ НОВЫЕ АДМИН-ФУНКЦИИ v1.3
+// ═══════════════════════════════════════════════════════════
+
+async function aGiveBulbs() {
+    const nick = document.getElementById('anb')?.value.trim();
+    const amt = parseInt(document.getElementById('aamt')?.value);
+    if (!nick || isNaN(amt) || amt <= 0) { notify('❌ Заполни ник и количество!'); return; }
+    
+    const snap = await db.ref('players/' + nick).once('value');
+    if (!snap.exists()) { notify('❌ Игрок не найден!'); return; }
+    
+    const player = snap.val();
+    const newBulbs = (player.bulbs || 0) + amt;
+    
+    await db.ref('players/' + nick).update({ bulbs: newBulbs });
+    
+    if (P && P.nick === nick) {
+        P.bulbs = newBulbs;
+        updS();
+    }
+    
+    notify(`✅ ${amt}💡 выдано игроку ${nick}!`);
+    pChat(null, `👑 Админ выдал ${amt}💡 игроку ${nick}`, 'sys', '');
+}
+
+async function aGiveCase() {
+    const nick = document.getElementById('acasenick').value.trim();
+    const type = document.getElementById('acasetype').value;
+    const amt = parseInt(document.getElementById('acaseamt').value) || 1;
+    if(!nick){ notify('❌ Введи ник!'); return; }
+    
+    const snap = await db.ref('players/' + nick).once('value');
+    if(!snap.exists()){ notify('❌ Игрок не найден!'); return; }
+    
+    const player = snap.val();
+    const cases = player.cases || { common: 0, rare: 0, legendary: 0 };
+    cases[type] = (cases[type] || 0) + amt;
+    
+    await db.ref('players/' + nick).update({ cases });
+    
+    notify(`✅ ${amt} ${getCaseName(type)} ящиков выдано ${nick}!`);
+    pChat(null, `👑 Админ выдал ${amt} ${getCaseName(type)} ящиков игроку ${nick}`, 'sys', '');
+}
+
+async function aGiveGems() {
+    const nick = document.getElementById('agemsnick')?.value.trim();
+    const amt = parseInt(document.getElementById('agemsamt')?.value);
+    if (!nick || isNaN(amt) || amt <= 0) { notify('❌ Заполни ник и количество!'); return; }
+    
+    const snap = await db.ref('players/' + nick).once('value');
+    if (!snap.exists()) { notify('❌ Игрок не найден!'); return; }
+    
+    const player = snap.val();
+    const newGems = (player.gems || 0) + amt;
+    
+    await db.ref('players/' + nick).update({ gems: newGems });
+    
+    if (P && P.nick === nick) {
+        P.gems = newGems;
+        updS();
+    }
+    
+    notify(`✅ ${amt}💎 выдано игроку ${nick}!`);
+    pChat(null, `👑 Админ выдал ${amt}💎 игроку ${nick}`, 'sys', '');
+}
+
+// Выдать пин
+async function aGivePin(){
+  const nick = document.getElementById('apinnick').value.trim();
+  const pin = document.getElementById('apintype').value;
+  if(!nick){ notify('❌ Введи ник!'); return; }
+  const snap = await db.ref('players/' + nick).once('value');
+  if(!snap.exists()){ notify('❌ Игрок не найден!'); return; }
+  const player = snap.val();
+  const pins = player.pins || [];
+  if(!pins.includes(pin)){
+    pins.push(pin);
+    await db.ref('players/' + nick).update({ pins });
+  }
+  notify(`✅ Пин ${getPinName(pin)} выдан ${nick}!`);
+  pChat(null, `👑 Админ выдал пин ${getPinName(pin)} игроку ${nick}`, 'sys', '');
+}
+
+// Выдать серию
+async function aGiveStreak(){
+  const nick = document.getElementById('astreaknick').value.trim();
+  const days = parseInt(document.getElementById('astreakdays').value) || 1;
+  if(!nick || days < 1){ notify('❌ Заполни ник и дни!'); return; }
+  const snap = await db.ref('players/' + nick).once('value');
+  if(!snap.exists()){ notify('❌ Игрок не найден!'); return; }
+  await db.ref('players/' + nick).update({ streak: days, lastQuestDate: todayKey(), questDone: true });
+  notify(`✅ Серия ${days} дней установлена для ${nick}!`);
+  pChat(null, `👑 Админ установил серию ${days} дней игроку ${nick}`, 'sys', '');
+}
+
+// Разбанить игрока
+async function aUnbanPlayer(){
+  const nick = document.getElementById('aunbannick').value.trim();
+  if(!nick){ notify('❌ Введи ник!'); return; }
+  await db.ref('banned/' + nick).remove();
+  notify(`✅ Игрок ${nick} разбанен!`);
+  pChat(null, `👑 Админ разбанил игрока ${nick}`, 'sys', '');
+}
+
+// Запустить ивент
+async function aStartEvent(){
+  const type = document.getElementById('aeventtype').value;
+  const duration = parseInt(document.getElementById('aeventduration').value) || 5;
+  const endsAt = Date.now() + duration * 60 * 1000;
+  
+  if(type === 'blackcube'){ aStartBlackCube(); notify('✅ Чёрный куб запущен!'); return; }
+  let eventName = '';
+  if(type === 'canvas') eventName = '🎨 Полотно 150x150';
+  else if(type === 'drops') eventName = '☁️ Дропы с неба';
+  else if(type === 'fast') eventName = '⚡ Быстрые пиксели';
+  else if(type === 'quest') eventName = '🎁 50 пикселей = ящик';
+  
+  await db.ref('config/event').set({
+    active: true,
+    type: type,
+    endsAt: endsAt,
+    duration: duration,
+    startedBy: P.nick,
+    startedAt: Date.now()
+  });
+  
+  showEventBanner(`${eventName} начался! ${duration} мин.`);
+  notify(`✅ Ивент "${eventName}" запущен на ${duration} мин!`);
+  pChat(null, `⚡ Админ запустил ивент: ${eventName} (${duration} мин)!`, 'sys', '');
+}
+
+// Остановить ивент
+async function aStopEvent(){
+  await db.ref('config/event').update({ active: false });
+  document.getElementById('eventBanner').style.display = 'none';
+  notify('✅ Ивент остановлен!');
+  pChat(null, `⚡ Админ остановил ивент`, 'sys', '');
+}
+
+// Показать баннер ивента
+function showEventBanner(text){
+  const banner = document.getElementById('eventBanner');
+  banner.textContent = text;
+  banner.style.display = 'block';
+}
+
+// listenEvents определён ниже в v1.3 блоке (полная версия с дропами и кубом)
+
+// ══ ОЧИСТИТЬ ВСЕ ПИКСЕЛИ ══
+async function aClrPx(){
+  if(!confirm('⚠️ ВНИМАНИЕ! Все пиксели будут удалены навсегда! Продолжить?')) return;
+  
+  // Удаляем из Firebase
+  await db.ref('pixels').remove();
+  
+  // Удаляем с карты
+  Object.keys(pxL).forEach(k => {
+    map.removeLayer(pxL[k]);
+    delete pxL[k];
+  });
+  Object.keys(pxD).forEach(k => delete pxD[k]);
+  
+  notify('🗑️ Все пиксели очищены!');
+  pChat(null, '👑 Админ очистил все пиксели!', 'sys', '');
+}
+// ══ VERSION ══
+function updateVersionDisplay(v){
+  document.title = '💡 Pixel Battle v' + v;
+  document.querySelector('.llogo').innerHTML = '💡 PIXEL<br>BATTLE v' + v;
+  document.querySelector('.logo').textContent = '💡PB v' + v;
+}
+
+function listenVersion(){
+  db.ref('config/version').on('value', s => {
+    const v = s.val() || '1.3';
+    updateVersionDisplay(v);
+  });
+}
+
+async function aSetVersion(){
+  const version = document.getElementById('aversion').value.trim();
+  if(!version){ notify('❌ Введи версию!'); return; }
+  await db.ref('config/version').set(version);
+  updateVersionDisplay(version);
+  notify('✅ Версия изменена на ' + version);
+}
+// ══ ЗАГРУЗКА ОНЛАЙНА В АДМИН-ПАНЕЛЬ ══
+function loadOnline(){
+  const cut = Date.now() - 2 * 60 * 1000;
+  db.ref('online').once('value', s => {
+    const all = s.val() || {};
+    const act = Object.values(all).filter(u => u.t > cut);
+    const el = document.getElementById('onl');
+    if(!el) return;
+    
+    if(act.length === 0){
+      el.innerHTML = 'Никого нет';
+      return;
+    }
+    
+    let html = '<b style="color:var(--accent)">' + act.length + ' онлайн:</b><br>';
+    act.forEach(u => {
+      html += '<span class="odot"></span>' + esc(u.nick) + (u.clan ? ' [' + u.clan + ']' : '') + '  ';
+    });
+    el.innerHTML = html;
+  });
+}
+// ══ LISTENERS ══
+function listenMaint(){
+  db.ref('maintenance').on('value',s=>{
+    const d=s.val();
+    if(d&&d.on&&P&&P.nick!=='Danya amlet'&&!isAdmin)document.getElementById('maint').classList.add('on');
+    else document.getElementById('maint').classList.remove('on');
+  });
+}
+function listenBcast(){
+  let lt=0;
+  db.ref('broadcast').on('value',s=>{const d=s.val();if(!d||d.t<=lt)return;lt=d.t;document.getElementById('btxt').textContent='📢 '+d.msg;document.getElementById('bcast').style.display='block';});
+}
+
+// ══ PANELS ══
+function togglePanel(id,btn){ play('open');
+  const p=document.getElementById(id);const op=p.classList.contains('open');
+  closeAll();
+  if(!op){p.classList.add('open');if(btn)document.getElementById(btn).classList.add('on');if(id==='cpanel')setTimeout(()=>swtab(ctab),50);}
+}
+function closeAll(){ play('open');document.querySelectorAll('.panel').forEach(p=>p.classList.remove('open'));document.querySelectorAll('.ibtn').forEach(b=>b.classList.remove('on'));}
+
+// ══ TOOLTIP / NOTIFY ══
+const tp=document.getElementById('tip');
+function tipAt(x,y,t){tp.style.display='block';tp.style.left=(x+8)+'px';tp.style.top=(y-28)+'px';tp.textContent=t;}
+function hideTip(){tp.style.display='none';}
+let nt=null;
+function notify(t){const el=document.getElementById('notify');el.innerHTML=t.replace(/\n/g,'<br>');el.style.display='block';clearTimeout(nt);nt=setTimeout(()=>el.style.display='none',3500);}
+
+document.getElementById('lp').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+// ═══════════════════════════════════════════════════════════
+// ══ НОВЫЕ ПЕРЕМЕННЫЕ v1.3 (добавить в начало скрипта тоже)
+// ═══════════════════════════════════════════════════════════
+
+// Эти переменные уже должны быть объявлены в начале скрипта,
+// но если их нет — добавь их в начало, где объявляются P, pm, dm и т.д.
+
+// let currentDrops = [];
+// let dropIndex = 0;
+
+// ═══════════════════════════════════════════════════════════
+// ══ ФУНКЦИИ ДЛЯ ЯЩИКОВ
+// ═══════════════════════════════════════════════════════════
+
+// Открыть модальное окно ящиков
+function openCasesModal() {
+  if (!P) { notify('❌ Сначала войдите в аккаунт!'); return; }
+  const cases = P.cases || {};
+  document.getElementById('commonCount').textContent  = cases.common   || 0;
+  document.getElementById('rareCount').textContent    = cases.rare     || 0;
+  document.getElementById('legendaryCount').textContent = cases.legendary || 0;
+  const rc = document.getElementById('roosterCount');
+  if (rc) rc.textContent = cases.rooster || 0;
+  document.getElementById('casesModal').style.display = 'flex';
+}
+
+function getCaseName(type) {
+  if (type === 'common') return 'Обычный';
+  if (type === 'rare') return 'Средний';
+  if (type === 'legendary') return 'Легендарный';
+  if (type === 'rooster') return 'Петушиный';
+  return type;
+}
+
+// Купить ящик за алмазы
+async function buyCase(type) { play('pay');
+    if (!P) { notify('❌ Сначала войдите в аккаунт!'); return; }
+    
+    const prices = { common: 5, rare: 20, legendary: 50 };
+    const cost = prices[type];
+    
+    if (!cost) return;
+    
+    const gems = P.gems || 0;
+    if (gems < cost) {
+        notify(`❌ Не хватает 💎! Нужно ${cost}💎`);
+        return;
+    }
+    
+    // Списываем алмазы
+    P.gems -= cost;
+    
+    // Добавляем ящик
+    if (!P.cases) P.cases = { common: 0, rare: 0, legendary: 0 };
+    P.cases[type] = (P.cases[type] || 0) + 1;
+    
+    // Сохраняем в Firebase
+    await saveP();
+    
+    // Обновляем интерфейс
+    updS();
+    renderShop();
+    updateCasesDisplay();
+    
+    notify(`✅ Куплен ${getCaseName(type)} ящик!`);
+    closeAll();
+    openCasesModal();
+}
+
+// Количество ящиков при открытии
+function adjQty(type, delta){
+  const inp = document.getElementById('qty-'+type);
+  if(!inp) return;
+  const max = (P && P.cases) ? (P.cases[type]||0) : 1;
+  inp.value = Math.max(1, Math.min(max, (parseInt(inp.value)||1) + delta));
+}
+function openCaseWithQty(type){
+  const inp = document.getElementById('qty-'+type);
+  const qty = inp ? Math.max(1, Math.min(parseInt(inp.value)||1, (P&&P.cases)?P.cases[type]||0:0)) : 1;
+  openCase(type, qty);
+}
+
+// Открыть ящик
+async function openCase(type) {
+  if (!P) return;
+  if (!P.cases) P.cases = {};
+  const count = P.cases[type] || 0;
+  if (count <= 0) { notify('❌ Нет ящиков «' + getCaseName(type) + '»!'); return; }
+
+  P.cases[type]--;
+  await saveP();
+  document.getElementById('casesModal').style.display = 'none';
+
+  currentDrops = (type === 'rooster') ? generateRoosterDrops() : generateDrops(type);
+  dropIndex = 0;
+
+  const iconMap = { common:'🎯', rare:'💡', legendary:'👑', rooster:'🐔' };
+  document.getElementById('openingIcon').textContent = iconMap[type] || '🎁';
+  document.getElementById('openingText').textContent = 'ОТКРЫВАЕМ...';
+  document.getElementById('dropContainer').innerHTML = '';
+  document.getElementById('caseOpeningModal').style.display = 'flex';
+  setTimeout(() => showNextDrop(), 1200);
+}
+
+// Генерация дропов по шансам
+function generateDrops(type) {
+  const drops = [];
+  
+  // Определяем количество дропов
+  let dropCount = 1;
+  const rand = Math.random() * 100;
+  
+  if (type === 'common') {
+    if (rand < 20) dropCount = 1;
+    else if (rand < 95) dropCount = 2;
+    else dropCount = 3;
+  } else if (type === 'rare') {
+    if (rand < 60) dropCount = 2;
+    else if (rand < 90) dropCount = 3;
+    else dropCount = 4;
+  } else if (type === 'legendary') {
+    if (rand < 60) dropCount = 3;
+    else if (rand < 80) dropCount = 4;
+    else if (rand < 95) dropCount = 5;
+    else dropCount = 6;
+  }
+  
+  // Генерируем каждый дроп
+  for (let i = 0; i < dropCount; i++) {
+    drops.push(generateSingleDrop(type));
+  }
+  
+  return drops;
+}  // ← ЭТА СКОБКА БЫЛА ОТСУТСТВУЕТ!
+
+// Один дроп
+function generateSingleDrop(type) {
+  const r = Math.random() * 100;
+  
+  if (type === 'common') {
+    if (r < 30) return { type: 'bulbs', value: 15, text: '💡 15 лампочек' };
+    if (r < 55) return { type: 'bulbs', value: 20, text: '💡 20 лампочек' };
+    if (r < 75.5) return { type: 'ink', value: 5, text: '🎨 5 красок' };
+    if (r < 80.5) return { type: 'pin', value: 'check', text: '✅ Пин: Галочка' };
+    return { type: 'title', value: '🎯', text: '🏷️ Титул «🎯» + 10💡' };
+  }
+  
+  if (type === 'rare') {
+    if (r < 30) return { type: 'bulbs', value: 50, text: '💡 50 лампочек' };
+    if (r < 55) return { type: 'xp', value: 50, text: '⭐ 50 XP' };
+    if (r < 70) return { type: 'ink', value: 15, text: '🎨 15 красок' };
+    if (r < 80) return { type: 'pin', value: 'banana', text: '🍌 Пин: Банан' };
+    return { type: 'title', value: '💡', text: '🏷️ Титул «💡»' };
+  }
+  
+  // legendary
+  if (r < 25) return { type: 'bulbs', value: 250, text: '💡 250 лампочек' };
+  if (r < 50) return { type: 'xp', value: 50, text: '⭐ 50 XP' };
+  if (r < 65) return { type: 'ink', value: 20, text: '🎨 20 красок' };
+  if (r < 70) return { type: 'pin', value: 'clown', text: '👎🤡 Пин: Клоун' };
+  if (r < 70.999) return { type: 'title', value: '👑', text: '🏷️ Титул «👑»' };
+  return { type: 'gems', value: Math.floor(Math.random() * 5) + 3, text: '💎 Алмазы' };
+}
+
+// Показать следующий дроп
+async function showNextDrop() {
+  if (dropIndex >= currentDrops.length) {
+    const textEl = document.getElementById('openingText');
+    if (textEl) textEl.textContent = '🎉 ГОТОВО!';
+    const icon = document.getElementById('openingIcon');
+    if (icon) { icon.textContent = '🎉'; icon.style.animation = 'none'; }
+    const container = document.getElementById('dropContainer');
+    if (container) {
+      const tap = document.createElement('div');
+      tap.className = 'opening-tap';
+      tap.textContent = '▶ Нажми чтобы закрыть';
+      container.appendChild(tap);
+      container.scrollTop = 99999;
+    }
+    play('buy');
+    updateCasesDisplay(); updS();
+    return;
+  }
+
+  const drop = currentDrops[dropIndex];
+  const textEl = document.getElementById('openingText');
+  if (textEl) textEl.textContent = 'ДРОП ' + (dropIndex+1) + '/' + currentDrops.length;
+
+  await applyDrop(drop);
+  play('open');
+
+  const container = document.getElementById('dropContainer');
+  if (container) {
+    const icons = { bulbs:'💡', xp:'⭐', ink:'🎨', inkLimit:'🎒', color:'🎨', pin:'📌', title:'🏷️', gems:'💎', case:'🎁' };
+    const dropEl = document.createElement('div');
+    dropEl.className = 'drop-item';
+    dropEl.innerHTML = '<span class="di">'+(icons[drop.type]||'✨')+'</span><span class="dt">'+(drop.text||'???')+'</span>';
+    container.appendChild(dropEl);
+    container.scrollTop = 99999;
+  }
+
+  dropIndex++;
+  setTimeout(() => showNextDrop(), 480);
+}
+
+// nextDrop — оставлен для обратной совместимости
+function nextDrop() {
+  if (dropIndex < currentDrops.length) showNextDrop();
+  else { document.getElementById('caseOpeningModal').style.display = 'none'; play('open'); }
+}
+
+// Применить дроп к игроку
+async function applyDrop(drop) {
+  if (!P) return;
+  
+  if (drop.type === 'bulbs') {
+    P.bulbs = (P.bulbs || 0) + drop.value;
+  } else if (drop.type === 'xp') {
+    P.xp = (P.xp || 0) + drop.value;
+    chkLvl();
+  } else if (drop.type === 'ink') {
+    P.ink = Math.min(P.inkMax, (P.ink || 0) + drop.value);
+  } else if (drop.type === 'gems') {
+    P.gems = (P.gems || 0) + drop.value;
+  } else if (drop.type === 'pin') {
+    if (!P.pins) P.pins = [];
+    if (!P.pins.includes(drop.value)) {
+      P.pins.push(drop.value);
+      notify(`✅ Получен новый пин: ${drop.text}`);
+    }
+  } else if (drop.type === 'title') {
+    if (!P.titles) P.titles = [];
+    if (!P.titles.includes(drop.value)) {
+      P.titles.push(drop.value);
+      notify(`🏆 Получен титул: ${drop.value}`);
+    }
+    if (drop.value === '🎯') P.bulbs = (P.bulbs || 0) + 10;
+  }
+  
+  await saveP();
+}
+
+// Обновить отображение ящиков
+function updateCasesDisplay() {
+  if (!P) return;
+  const cases = P.cases || {};
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('commonCount',    cases.common    || 0);
+  set('rareCount',      cases.rare      || 0);
+  set('legendaryCount', cases.legendary || 0);
+  set('roosterCount',   cases.rooster   || 0);
+  const gemsEl = document.getElementById('sgems');
+  if (gemsEl) gemsEl.textContent = P.gems || 0;
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ ФУНКЦИИ ДЛЯ АЛМАЗОВ
+// ═══════════════════════════════════════════════════════════
+
+// Пополнение алмазов через Telegram
+function buyGems() {
+  if (!P || !P.nick) {
+    notify('❌ Сначала войдите в аккаунт!');
+    return;
+  }
+  
+  const message = `Здравствуйте! Хочу купить алмазы. Мой ник в игре: ${P.nick}`;
+  window.open(`https://t.me/mkjssonus?text=${encodeURIComponent(message)}`, '_blank');
+  notify('📱 Переходим в Telegram...');
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ ФУНКЦИИ ДЛЯ ПИНОВ
+// ═══════════════════════════════════════════════════════════
+
+// Показать/скрыть меню пинов
+function togglePinsMenu() {
+  const menu = document.getElementById('pinsMenu');
+  const btn = document.getElementById('pinbtn');
+  
+  if (!menu) return;
+  
+  if (menu.style.display === 'flex') {
+    menu.style.display = 'none';
+  } else {
+    // Позиционируем меню рядом с кнопкой
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      menu.style.left = rect.left + 'px';
+      menu.style.bottom = (window.innerHeight - rect.top + 10) + 'px';
+    }
+    renderPinsMenu();
+    menu.style.display = 'flex';
+  }
+}
+
+// Закрывать меню при клике вне
+document.addEventListener('click', function(e) {
+  const menu = document.getElementById('pinsMenu');
+  const btn = document.getElementById('pinbtn');
+  
+  if (!menu || !btn) return;
+  
+  if (!menu.contains(e.target) && e.target !== btn) {
+    menu.style.display = 'none';
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// ══ ФУНКЦИИ ПИНОВ (ПОЛНЫЙ БЛОК)
+// ═══════════════════════════════════════════════════════════
+
+function renderPinsMenu() {
+  const menu = document.getElementById('pinsMenu');
+  if (!menu) return;
+  
+  const pins = P?.pins || [];
+  
+  if (pins.length === 0) {
+    menu.innerHTML = '<div class="pin-item" style="color:#888; justify-content:center;">😢 Нет пинов</div>';
+    return;
+  }
+  
+  menu.innerHTML = '';
+  
+  pins.forEach(pin => {
+    let icon = pin;
+    if (pin === 'check') icon = '✅';
+    else if (pin === 'banana') icon = '🍌';
+    else if (pin === 'clown') icon = '👎🤡';
+    
+    const item = document.createElement('div');
+    item.className = 'pin-item';
+    item.innerHTML = `<span>${icon}</span> <span style="font-size:12px;">${getPinName(pin)}</span>`;
+    item.onclick = () => usePin(pin);
+    menu.appendChild(item);
+  });
+}
+
+function getPinName(pin) {
+  if (pin === 'check') return 'Галочка';
+  if (pin === 'banana') return 'Банан';
+  if (pin === 'clown') return 'Клоун';
+  return pin;
+}
+
+function usePin(pin) {
+  if (!P) return;
+  // Определяем иконку пина
+  const icons = { check:'✅', banana:'🍌', clown:'👎🤡', rooster:'🐔' };
+  const icon = icons[pin] || pin;
+  // Отправляем в чат как обычное сообщение с пином
+  const chatRef = ctab === 'c' && P.clan
+    ? db.ref('clan_chat/' + P.clan)
+    : db.ref('chat');
+  chatRef.push({ nick: P.nick, txt: icon, type: 'pin', clan: P.clan || '', title: P.activeTitle || '', t: Date.now() });
+  if (!P.pinUsage) P.pinUsage = {};
+  P.pinUsage[pin] = (P.pinUsage[pin] || 0) + 1;
+  saveP();
+  const pinsMenu = document.getElementById('pinsMenu');
+  if (pinsMenu) pinsMenu.style.display = 'none';
+  notify('📌 Пин ' + icon + ' отправлен!');
+  // Проверка разблокировки рисования
+  if ((P.pinUsage[pin] || 0) >= 15 && !(P.unlockedPins || []).includes(pin)) {
+    notify('🔓 Можешь разблокировать рисование пина ' + getPinName(pin) + ' за 250💡 в Магазине!');
+  }
+  renderShop();
+}
+
+function checkPinUnlock(pin) {
+  if (!P) return;
+  const usage = P.pinUsage?.[pin] || 0;
+  if (usage >= 15 && !P.unlockedPins?.includes(pin)) {
+    notify(`🔓 Вы можете разблокировать рисование пина ${getPinName(pin)} за 250💡!`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ ИНИЦИАЛИЗАЦИЯ НОВЫХ ПОЛЕЙ
+// ═══════════════════════════════════════════════════════════
+
+function initNewFields() {
+  if (!P) return;
+  if (P.gems === undefined) P.gems = 0;
+  if (!P.cases) P.cases = { common: 0, rare: 0, legendary: 0 };
+  if (!P.pins) P.pins = [];
+  if (!P.pinUsage) P.pinUsage = {};
+  if (!P.titles) P.titles = [];
+  if (!P.unlockedPins) P.unlockedPins = [];
+  if (P.streak === undefined) P.streak = 0;
+  if (!P.lastQuestDate) P.lastQuestDate = '';
+  if (P.questDone === undefined) P.questDone = false;
+  if (P.savedStreak === undefined) P.savedStreak = false;
+  if (!P.inkLimitPrices) P.inkLimitPrices = [35, 100, 345];
+}
+
+window.addEventListener('load',()=>{autoLogin();})
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: ЗАПАС КРАСОК (ПОКУПКА ЛИМИТА inkMax)
+// ═══════════════════════════════════════════════════════════
+
+function buyInkLimit(tier) {
+  if (!P) return;
+  const prices = P.inkLimitPrices || [35, 100, 345];
+  const gains  = [1, 5, 10];
+  const cost   = prices[tier];
+  const gain   = gains[tier];
+  if (P.bulbs < cost) { notify('❌ Нужно 💡' + cost + '!'); return; }
+  P.bulbs  -= cost;
+  P.inkMax += gain;
+  P.ink    = Math.min(P.ink + gain, P.inkMax);
+  // цена растёт с вероятностью 67%
+  const bumps = [10, 25, 80];
+  if (Math.random() < 0.67) prices[tier] += bumps[tier];
+  P.inkLimitPrices = prices;
+  saveP(); updS(); renderShop();
+  notify('🎒 +' + gain + ' к лимиту красок! Теперь: ' + P.inkMax); play('buy');
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: ПЕТУШИНЫЙ КЕЙС
+// ═══════════════════════════════════════════════════════════
+
+async function buyRoosterCase() {
+  if (!P) return;
+  const cost = 200;
+  if ((P.gems || 0) < cost) { notify('❌ Нужно 200💎!'); return; }
+  P.gems -= cost;
+  if (!P.cases) P.cases = {};
+  P.cases.rooster = (P.cases.rooster || 0) + 1;
+  await saveP(); updS();
+  notify('🐔 Петушиный кейс куплен!'); play('buy');
+}
+
+function generateRoosterDrops() {
+  const drops = [];
+  for (let i = 0; i < 2; i++) {
+    const r = Math.random() * 100;
+    if (r < 50) { /* ничего */ }
+    else if (r < 89) drops.push({ type: 'bulbs', value: 1, text: '💡 1 лампочка' });
+    else if (r < 93) drops.push({ type: 'pin',   value: 'rooster', text: '🐔 Пин: Петух' });
+    else if (r < 96) drops.push({ type: 'title', value: '🐔', text: '🏷️ Титул «Обычный»' });
+    else if (r < 99.6) drops.push({ type: 'title', value: '🔥', text: '🏷️ Титул «Перемога»' });
+    else drops.push({ type: 'pin', value: '🥚', text: '🥚 Пин: Яйцо' });
+  }
+  return drops.length ? drops : [{ type: 'bulbs', value: 0, text: '😔 Ничего' }];
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: ТАЙМЕР ДО 11:00 МСК
+// ═══════════════════════════════════════════════════════════
+
+function getMskResetMs() {
+  const now = new Date();
+  // MSK = UTC+3
+  const msk = new Date(now.getTime() + 3 * 3600000);
+  let next = new Date(Date.UTC(msk.getUTCFullYear(), msk.getUTCMonth(), msk.getUTCDate(), 8, 0, 0)); // 11:00 MSK = 08:00 UTC
+  if (msk.getUTCHours() >= 8) next.setUTCDate(next.getUTCDate() + 1);
+  return next.getTime() - now.getTime();
+}
+
+let resetTimerInterval = null;
+function startResetTimer(elId) {
+  if (resetTimerInterval) clearInterval(resetTimerInterval);
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const tick = () => {
+    const ms  = getMskResetMs();
+    const h   = Math.floor(ms / 3600000);
+    const m   = Math.floor((ms % 3600000) / 60000);
+    const s   = Math.floor((ms % 60000) / 1000);
+    el.textContent = '⏰ Сброс через: ' + h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  };
+  tick();
+  resetTimerInterval = setInterval(tick, 1000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: АВТО-ЗАПУСК ИВЕНТОВ В 11:00 МСК
+// ═══════════════════════════════════════════════════════════
+
+function scheduleAutoEvents() {
+  const msUntil = getMskResetMs();
+  setTimeout(async () => {
+    await runDailyReset();
+    if (isAdmin) tryAutoStartEvent();
+    // повтор каждые 24 часа
+    setInterval(async () => {
+      await runDailyReset();
+      if (isAdmin) tryAutoStartEvent();
+    }, 24 * 3600000);
+  }, msUntil);
+}
+
+async function runDailyReset() {
+  if (!P) return;
+  const today = todayKey();
+  if (P.lastQuestDate === today) return; // уже сброшено сегодня
+  P.lastQuestDate = today;
+  P.questDone     = false;
+  P.questProgress = 0;
+  P.bonusDone     = false;
+  P.bonusProgress = 0;
+  if (P.level >= 5) P.flagAvailable = true;
+  await saveP(); updS();
+  notify('🌅 Новый день! Задание сброшено.');
+  loadActivityPanel();
+}
+
+async function tryAutoStartEvent() {
+  // Только один игрок (первый онлайн) запускает — проверяем флаг в Firebase
+  const snap = await db.ref('config/autoEventDate').once('value');
+  const today = todayKey();
+  if (snap.val() === today) return; // уже запущен сегодня
+  await db.ref('config/autoEventDate').set(today);
+
+  const r = Math.random() * 100;
+  let type = null;
+  if      (r < 10) type = 'canvas';
+  else if (r < 20) type = 'drops';
+  else if (r < 30) type = 'fast';
+  else if (r < 40) type = 'quest';
+  // 60% — ничего
+
+  if (!type) return;
+  const duration = 10; // минут
+  await db.ref('config/event').set({
+    active: true, type, duration,
+    endsAt: Date.now() + duration * 60000,
+    startedBy: 'auto', startedAt: Date.now()
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: СЕРИЯ ДНЕЙ — полная механика
+// ═══════════════════════════════════════════════════════════
+
+// Таблица особых наград (забираются вручную)
+const STREAK_DAY_REWARDS = {
+  5:   { bulbs:30,  xp:45,  ink:5,   cases:['common'] },
+  10:  { bulbs:40,  xp:0,   ink:50,  cases:['rare'] },
+  15:  { bulbs:30,  xp:45,  ink:5,   cases:['common'] },
+  20:  { bulbs:40,  xp:0,   ink:50,  cases:['rare'] },
+  25:  { bulbs:30,  xp:45,  ink:5,   cases:['common'] },
+  30:  { bulbs:100, xp:50,  ink:0,   cases:['rare'] },
+  35:  { bulbs:115, xp:0,   ink:25,  cases:['common'] },
+  40:  { bulbs:100, xp:50,  ink:0,   cases:['rare'] },
+  45:  { bulbs:100, xp:50,  ink:0,   cases:['rare'] },
+  50:  { bulbs:200, xp:40,  ink:40,  cases:['legendary'] },
+  60:  { bulbs:0,   xp:0,   ink:0,   cases:['rare'] },
+  65:  { bulbs:0,   xp:0,   ink:0,   cases:['common'] },
+  100: { bulbs:250, xp:0,   ink:25,  cases:['legendary','legendary','legendary','legendary','legendary','rare','rare','common'], inkLimit:5 },
+  365: { bulbs:5000,xp:0,   ink:150, cases:['legendary','legendary','legendary','legendary','legendary'], inkLimit:100, title:'ОЛД' },
+};
+
+// Промежуточная случайная награда (не особые дни)
+function randomDailyReward() {
+  const r = Math.floor(Math.random() * 4);
+  if (r === 0) return { xp: 15 };
+  if (r === 1) return { ink: 5 };
+  if (r === 2) return { inkLimit: 10 };
+  return { bulbs: 15 };
+}
+
+async function claimStreakDay(day) {
+  if (!P) return;
+  if (!P.streakRewardsClaimed) P.streakRewardsClaimed = [];
+  if (P.streakRewardsClaimed.includes(day)) { notify('Уже получено!'); return; }
+  if ((P.streak || 0) < day) { notify('❌ Серия меньше ' + day + ' дней!'); return; }
+
+  const reward = STREAK_DAY_REWARDS[day] || (() => {
+    // промежуточный день
+    if (day >= 364) return { bulbs: 10000, ink: 300, xp: 500 }; // дни 364-365 золотые
+    return randomDailyReward();
+  })();
+
+  if (reward.bulbs)    P.bulbs    = (P.bulbs || 0)  + reward.bulbs;
+  if (reward.xp)       P.xp       = (P.xp || 0)     + reward.xp;
+  if (reward.ink)      P.ink      = Math.min((P.ink||0) + reward.ink, P.inkMax);
+  if (reward.inkLimit) { P.inkMax += reward.inkLimit; P.ink = Math.min(P.ink, P.inkMax); }
+  if (reward.title) {
+    if (!P.titles) P.titles = [];
+    if (!P.titles.includes(reward.title)) P.titles.push(reward.title);
+  }
+  if (reward.cases) {
+    if (!P.cases) P.cases = { common:0, rare:0, legendary:0 };
+    reward.cases.forEach(c => { P.cases[c] = (P.cases[c] || 0) + 1; });
+  }
+
+  P.streakRewardsClaimed.push(day);
+  await saveP(); updS(); chkLvl();
+  notify('🎁 Награда за день ' + day + ' получена!');
+  loadActivityPanel();
+}
+
+async function saveStreak() {
+  if (!P) return;
+  if (P.savedStreak) { notify('❌ Спасение уже использовано!'); return; }
+  const cost = 150;
+  if ((P.bulbs || 0) < cost) { notify('❌ Нужно 150💡!'); return; }
+  P.bulbs -= cost;
+  P.savedStreak = true;
+  await saveP(); updS();
+  notify('🛟 Серия спасена! Она не сбросится завтра.');
+  loadActivityPanel();
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: ДОП. ЗАДАНИЯ (2 ШТУКИ, меняются в 11:00)
+// ═══════════════════════════════════════════════════════════
+
+const BONUS_QUEST_POOL = [
+  { id:'priv',    text:'Купи приват на своей территории',  type:'priv',    goal:1,  reward:{xp:25, ink:15, bulbs:20} },
+  { id:'replace', text:'Замени 5 чужих пикселей',         type:'replace', goal:5,  reward:{xp:25, ink:15, bulbs:20} },
+  { id:'bulbs50', text:'Набери 50 лампочек',               type:'bulbs',   goal:50, reward:{xp:25, ink:15, bulbs:20} },
+  { id:'place10', text:'Поставь 10 пикселей',              type:'place',   goal:10, reward:{xp:25, ink:15, bulbs:20} },
+  { id:'place25', text:'Поставь 25 пикселей',              type:'place',   goal:25, reward:{xp:25, ink:15, bulbs:20} },
+  { id:'chat5',   text:'Напиши 5 сообщений в чате',        type:'chat',    goal:5,  reward:{xp:25, ink:15, bulbs:20} },
+];
+
+function getDailyBonusQuests() {
+  const d    = new Date();
+  const seed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  const a    = BONUS_QUEST_POOL[ seed       % BONUS_QUEST_POOL.length];
+  const b    = BONUS_QUEST_POOL[(seed + 3)  % BONUS_QUEST_POOL.length];
+  return a.id === b.id ? [a, BONUS_QUEST_POOL[(seed + 5) % BONUS_QUEST_POOL.length]] : [a, b];
+}
+
+async function claimBonusQuest(idx) {
+  if (!P) return;
+  const quests = getDailyBonusQuests();
+  const q = quests[idx];
+  if (!q) return;
+  const prog = (P.bonusProgress || {})[q.id] || 0;
+  if (prog < q.goal) { notify('❌ Ещё не выполнено!'); return; }
+  if (!P.bonusClaimed) P.bonusClaimed = {};
+  if (P.bonusClaimed[todayKey() + '_' + q.id]) { notify('Уже получено!'); return; }
+  P.bonusClaimed[todayKey() + '_' + q.id] = true;
+  if (q.reward.xp)    P.xp    = (P.xp    || 0) + q.reward.xp;
+  if (q.reward.ink)   P.ink   = Math.min((P.ink||0) + q.reward.ink, P.inkMax);
+  if (q.reward.bulbs) P.bulbs = (P.bulbs || 0) + q.reward.bulbs;
+  if (q.reward.color && P.colors.length < COLORS.length) {
+    P.colors = COLORS.slice(0, P.colors.length + 1);
+    buildPal();
+  }
+  await saveP(); updS(); chkLvl();
+  notify('✅ Доп. задание выполнено!');
+  loadActivityPanel();
+}
+
+// Вызывается при действиях игрока
+function updateBonusProgress(type, amount) {
+  if (!P) return;
+  const quests = getDailyBonusQuests();
+  const today  = todayKey();
+  if (!P.bonusProgress) P.bonusProgress = {};
+  if (!P.bonusProgressDate || P.bonusProgressDate !== today) {
+    P.bonusProgress     = {};
+    P.bonusProgressDate = today;
+  }
+  quests.forEach(q => {
+    if (q.type === type) {
+      P.bonusProgress[q.id] = Math.min((P.bonusProgress[q.id] || 0) + amount, q.goal);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: ИВЕНТ — ЧЁРНЫЙ КУБ
+// ═══════════════════════════════════════════════════════════
+
+let blackCubeMarkers = [];
+let blackCubeParticipants = new Set();
+
+function listenBlackCubeEvent() {
+  db.ref('config/blackcube').on('value', s => {
+    const data = s.val();
+    blackCubeMarkers.forEach(m => map.removeLayer(m));
+    blackCubeMarkers = [];
+    if (!data || !data.active) return;
+
+    // Рисуем чёрные пиксели куба (до 150)
+    (data.pixels || []).slice(0, 150).forEach(px => {
+      const s2 = { la: 0.00025, ln: 0.00025 };
+      const r = L.rectangle(
+        [[px.lat - s2.la/2, px.lng - s2.ln/2],[px.lat + s2.la/2, px.lng + s2.ln/2]],
+        { color:'#000', fillColor:'#1a0000', fillOpacity:0.95, weight:1, className:'black-cube-px' }
+      ).addTo(map);
+      r.on('click', () => attackBlackCube(px));
+      blackCubeMarkers.push(r);
+    });
+
+    showEventBanner('⬛ ЧЁРНЫЙ КУБ! Уничтожь его! (' + (data.pixels||[]).length + '/150)');
+  });
+}
+
+async function attackBlackCube(px) {
+  if (!P || !pm) return;
+  blackCubeParticipants.add(P.nick);
+  const snap = await db.ref('config/blackcube').once('value');
+  const data  = snap.val();
+  if (!data || !data.active) return;
+  const pixels = (data.pixels || []).filter(p => !(p.lat === px.lat && p.lng === px.lng));
+  if (pixels.length === 0) {
+    await db.ref('config/blackcube').update({ active: false, pixels: [] });
+    onBlackCubeDestroyed();
+  } else {
+    await db.ref('config/blackcube').update({ pixels });
+  }
+  P.bulbs += 2; P.xp += 1; await saveP(); updS();
+}
+
+async function onBlackCubeDestroyed() {
+  pChat(null, '⬛ ЧЁРНЫЙ КУБ УНИЧТОЖЕН! Участники получают награды!', 'sys', '');
+  notify('🏆 КУБ УНИЧТОЖЕН!');
+  if (!blackCubeParticipants.has(P.nick)) return;
+  const r = Math.random() * 100;
+  if      (r < 1)  { if (!P.titles) P.titles = []; if (!P.titles.includes('⬛')) P.titles.push('⬛'); notify('🏷️ Получен титул «Веном»!'); }
+  else if (r < 6)  { P.cases = P.cases||{}; P.cases.legendary = (P.cases.legendary||0)+1; notify('👑 Легендарный ящик!'); }
+  else if (r < 21) { P.cases = P.cases||{}; P.cases.rare = (P.cases.rare||0)+1; notify('💡 Средний ящик!'); }
+  else if (r < 51) { P.cases = P.cases||{}; P.cases.common = (P.cases.common||0)+1; notify('🎯 Обычный ящик!'); }
+  await saveP(); updS();
+}
+
+async function aStartBlackCube() {
+  if (!isAdmin) return;
+  const center = map.getCenter();
+  const pixels = [];
+  for (let i = 0; i < 9; i++) {
+    pixels.push({
+      lat: Math.round((center.lat + (i%3 - 1) * 0.00025) / 0.00025) * 0.00025,
+      lng: Math.round((center.lng + (Math.floor(i/3) - 1) * 0.00025) / 0.00025) * 0.00025
+    });
+  }
+  await db.ref('config/blackcube').set({ active: true, pixels, startedAt: Date.now() });
+  notify('✅ Чёрный куб запущен!');
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: ПРОФИЛЬ ИГРОКА
+// ═══════════════════════════════════════════════════════════
+
+const ALL_TITLES = [
+  { id:'🎯',  how:'Из обычного ящика (1.1%)' },
+  { id:'💡',  how:'Из среднего ящика (5%)' },
+  { id:'👑',  how:'Из легендарного ящика (0.999%)' },
+  { id:'☁️', how:'Дроп с неба (2.5%)' },
+  { id:'🛠️', how:'Поставить 2500 пикселей' },
+  { id:'🌨️', how:'Дроп с неба (редкий)' },
+  { id:'🐔',  how:'Петушиный кейс (3%)' },
+  { id:'🔥',  how:'Петушиный кейс (0.4%)' },
+  { id:'🥚',  how:'Петушиный кейс (0.1%)' },
+  { id:'⬛',  how:'Ивент «Чёрный куб» (1%)' },
+  { id:'💡',  how:'Серия 40 дней' },
+  { id:'👑',  how:'Серия 100 дней' },
+  { id:'ОЛД', how:'Серия 365 дней' },
+];
+
+function openProfile() {
+  if (!P) return;
+  const modal = document.getElementById('profileModal');
+  if (!modal) return;
+  const titles = P.titles || [];
+  const active = P.activeTitle || '';
+  const titlesHtml = ALL_TITLES.map(t => {
+    const has  = titles.includes(t.id);
+    const sel  = active === t.id;
+    return `<div class="profile-title ${has?'has':''} ${sel?'sel':''}" onclick="${has?'selectTitle(\''+t.id+'\')':''}">
+      <span style="font-size:18px;">${t.id}</span>
+      <span style="font-size:10px;color:${has?'var(--green)':'var(--dim)'};">${has?'Есть':''+t.how}</span>
+      ${sel?'<span style="color:var(--accent);font-size:9px;">✓ АКТИВЕН</span>':''}
+    </div>`;
+  }).join('');
+
+  document.getElementById('profileBody').innerHTML = `
+    <div style="text-align:center;margin-bottom:12px;">
+      <div style="font-family:'Press Start 2P',monospace;font-size:11px;color:var(--accent);">${esc(P.nick)}</div>
+      <div style="font-size:13px;color:var(--dim);margin-top:4px;">Ур.${P.level} · 🔥${P.streak||0} дней · 💡${P.bulbs} · 💎${P.gems||0}</div>
+      ${active?`<div style="margin-top:6px;font-size:20px;">${active}</div>`:''}
+    </div>
+    <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:var(--dim);margin-bottom:6px;">ТИТУЛЫ</div>
+    <div style="display:flex;flex-direction:column;gap:5px;">${titlesHtml}</div>
+  `;
+  modal.style.display = 'flex';
+}
+
+async function selectTitle(id) {
+  if (!P) return;
+  P.activeTitle = P.activeTitle === id ? '' : id;
+  await saveP();
+  openProfile();
+  notify('✅ Титул ' + id + (P.activeTitle ? ' выбран!' : ' снят!'));
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: ОБНОВЛЁННЫЙ loadActivityPanel
+// ═══════════════════════════════════════════════════════════
+
+function loadActivityPanel() {
+  if (!P) return;
+  const body   = document.getElementById('actbody');
+  const done   = P.questDone  || false;
+  const prog   = Math.min(P.questProgress || 0, 3);
+  const streak = P.streak || 0;
+  const flagTxt = P.level >= 5
+    ? (P.flagAvailable ? '✅ Доступен! Нажми 🚩 на панели' : 'Уже использован сегодня')
+    : '🔒 Открывается на 5 уровне';
+  const dur = P.level >= 5 ? Math.round(flagDuration(P.level) / 60000) : '-';
+
+  // ── Лента дней (7 ячеек вокруг текущей серии) ──
+  const lenteStart = Math.max(1, streak - 3);
+  let lenteHtml = '<div class="streak-lenta">';
+  for (let d = lenteStart; d <= lenteStart + 6; d++) {
+    const isDone    = d <  streak + (done ? 1 : 0);
+    const isCurrent = d === streak + (done ? 0 : -1) + 1;
+    const isClaimed = (P.streakRewardsClaimed || []).includes(d);
+    const hasReward = !!STREAK_DAY_REWARDS[d];
+    const cls = isDone ? 'done' : isCurrent ? 'current' : 'locked';
+    const icon = isClaimed ? '✅' : hasReward ? '🎁' : (isDone ? '💡' : (isCurrent ? '🔥' : '🔒'));
+    lenteHtml += `<div class="streak-day ${cls}" onclick="claimStreakDay(${d})" title="День ${d}${hasReward?' (есть награда!)':''}">
+      <div class="streak-day-icon">${icon}</div>
+      <div class="streak-day-num">${d}</div>
+    </div>`;
+  }
+  lenteHtml += '</div>';
+
+  // ── Доп. задания ──
+  const bonusQuests = getDailyBonusQuests();
+  const todayK = todayKey();
+  let bonusHtml = '';
+  bonusQuests.forEach((q, i) => {
+    const pr  = (P.bonusProgress || {})[q.id] || 0;
+    const pct = Math.round(pr / q.goal * 100);
+    const claimed = !!(P.bonusClaimed || {})[todayK + '_' + q.id];
+    bonusHtml += `
+      <div class="quest-card ${claimed ? 'done' : ''}">
+        <div class="quest-title">${claimed ? '✅' : '📌'} ДОП. ЗАДАНИЕ ${i + 1}</div>
+        <div class="quest-desc">${q.text}</div>
+        <div style="font-size:13px;color:var(--accent);">${pr}/${q.goal}</div>
+        <div class="quest-progress"><div class="quest-fill" style="width:${pct}%"></div></div>
+        <div style="font-size:11px;color:var(--dim);">Награда: +${q.reward.xp}XP +${q.reward.ink}🎨 +${q.reward.bulbs}💡</div>
+        ${!claimed && pr >= q.goal ? `<button class="bb" onclick="claimBonusQuest(${i})" style="margin-top:4px;">🎁 ЗАБРАТЬ</button>` : ''}
+      </div>`;
+  });
+
+  // ── Спасение серии ──
+  const canSave = !P.savedStreak && (P.bulbs || 0) >= 150;
+  const saveBtn = P.savedStreak
+    ? '<div style="font-size:12px;color:var(--dim);text-align:center;">🛟 Спасение уже использовано</div>'
+    : `<button id="saveStreakBtn" ${canSave?'':'disabled'} onclick="saveStreak()">🛟 СПАСТИ СЕРИЮ — 150💡</button>`;
+
+  body.innerHTML = `
+    <div id="resetTimer"></div>
+
+    <div class="streak-box">
+      <div class="${done ? 'streak-fire' : 'streak-fire gray'}">🔥</div>
+      <div class="streak-info">
+        <div class="${done ? 'streak-num' : 'streak-num gray'}">${streak}</div>
+        <div class="streak-label">ДНЕЙ СЕРИИ</div>
+      </div>
+      <div style="margin-left:auto;font-size:11px;color:var(--dim);font-family:'Press Start 2P',monospace;">${done ? '✅ СДЕЛАНО' : '⏳ НЕ СДЕЛАНО'}</div>
+    </div>
+
+    ${lenteHtml}
+    ${saveBtn}
+
+    <div class="quest-card ${done ? 'done' : ''}">
+      <div class="quest-title">${done ? '✅' : '📋'} ОСНОВНОЕ ЗАДАНИЕ</div>
+      <div class="quest-desc">Установи 3 пикселя в любом месте.</div>
+      <div style="font-size:13px;color:var(--accent);">${prog}/3 пикселей</div>
+      <div class="quest-progress"><div class="quest-fill" style="width:${Math.round(prog/3*100)}%"></div></div>
+      ${done ? '<div style="color:var(--green);font-family:\'Press Start 2P\',monospace;font-size:7px;">ВЫПОЛНЕНО! +1 к серии</div>' : ''}
+    </div>
+
+    ${bonusHtml}
+
+    <div class="flag-info">
+      <b style="font-family:'Press Start 2P',monospace;font-size:7px;color:#ff9900;">🚩 ФЛАГ АКТИВНОСТИ</b><br>
+      ${flagTxt}<br>
+      <span style="color:var(--dim);font-size:12px;">Время: ${dur} мин · Ставится раз в день</span>
+    </div>
+  `;
+
+  startResetTimer('resetTimer');
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: ИВЕНТ «ДРОПЫ С НЕБА»
+// ═══════════════════════════════════════════════════════════
+
+let skyDropMarkers = [];
+function startSkyDrops(durationMs) {
+  const endAt = Date.now() + durationMs;
+  const interval = setInterval(() => {
+    if (Date.now() > endAt) { clearInterval(interval); skyDropMarkers.forEach(m => map.removeLayer(m)); skyDropMarkers = []; return; }
+    spawnSkyDrop();
+  }, 8000);
+  spawnSkyDrop();
+}
+
+function spawnSkyDrop() {
+  const bounds = map.getBounds();
+  const lat = bounds.getSouth() + Math.random() * (bounds.getNorth() - bounds.getSouth());
+  const lng = bounds.getWest()  + Math.random() * (bounds.getEast()  - bounds.getWest());
+  const icon = L.divIcon({ className:'', html:'<div class="sky-drop-icon">📦</div>', iconSize:[36,36], iconAnchor:[18,18] });
+  const m = L.marker([lat, lng], { icon }).addTo(map);
+  m.on('click', () => collectSkyDrop(m));
+  skyDropMarkers.push(m);
+  setTimeout(() => { if (skyDropMarkers.includes(m)) { map.removeLayer(m); skyDropMarkers = skyDropMarkers.filter(x => x !== m); } }, 30000);
+}
+
+async function collectSkyDrop(marker) {
+  if (!P) return;
+  map.removeLayer(marker);
+  skyDropMarkers = skyDropMarkers.filter(m => m !== marker);
+  const r = Math.random() * 100;
+  let msg = '';
+  if (r < 25)       { P.inkMax += 25; P.ink = Math.min(P.ink + 25, P.inkMax); msg = '🎒 +25 к лимиту красок!'; }
+  else if (r < 50)  { P.xp = (P.xp||0) + 30; chkLvl(); msg = '⭐ +30 XP!'; }
+  else if (r < 70)  { P.bulbs = (P.bulbs||0) + 30; msg = '💡 +30 лампочек!'; }
+  else if (r < 87)  { P.ink = Math.min((P.ink||0) + 15, P.inkMax); msg = '🎨 +15 красок!'; }
+  else if (r < 95)  { P.colors = COLORS.slice(0, Math.min(P.colors.length + 1, COLORS.length)); buildPal(); msg = '🎨 +1 новый цвет!'; }
+  else if (r < 97.5){ if (!P.titles) P.titles=[]; if (!P.titles.includes('☁️')) { P.titles.push('☁️'); msg = '🏷️ Титул «☁️ Облако»!'; } else msg = '💡 +50 лампочек!'; P.bulbs += 50; }
+  else              { P.bulbs = (P.bulbs||0) + 50; msg = '💡 +50 лампочек (редко)!'; }
+  await saveP(); updS();
+  notify('📦 Дроп! ' + msg);
+}
+
+// Слушаем ивенты и запускаем соответствующую механику
+function listenEvents() {
+  db.ref('config/event').on('value', s => {
+    const event = s.val();
+    if (event && event.active) {
+      if (event.endsAt < Date.now()) {
+        db.ref('config/event').update({ active: false });
+        document.getElementById('eventBanner').style.display = 'none';
+        return;
+      }
+      const mins = Math.ceil((event.endsAt - Date.now()) / 60000);
+      const names = { canvas:'🎨 Полотно', drops:'☁️ Дропы с неба', fast:'⚡ Быстрые пиксели', quest:'🎁 50 пкс = ящик' };
+      const name = names[event.type] || event.type;
+      document.getElementById('eventBanner').textContent = name + ' · ' + mins + ' мин';
+      document.getElementById('eventBanner').style.display = 'block';
+      if (event.type === 'drops' && !window._skyDropsStarted) {
+        window._skyDropsStarted = true;
+        startSkyDrops(event.endsAt - Date.now());
+      }
+    } else {
+      document.getElementById('eventBanner').style.display = 'none';
+      window._skyDropsStarted = false;
+    }
+  });
+  listenBlackCubeEvent();
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: РИСОВАНИЕ ПИНОВ НА КАРТЕ
+// ═══════════════════════════════════════════════════════════
+
+const PIN_COLORS = { check:'#4ade80', banana:'#ffcc00', clown:'#ff4444', rooster:'#ff8800' };
+let activePinType = null;
+let lastPinPlace = 0;
+
+function togglePinPaint(pinType) {
+  if (!P) return;
+  if (!(P.unlockedPins || []).includes(pinType)) {
+    const usage = (P.pinUsage || {})[pinType] || 0;
+    notify('🔒 Нужно использовать пин ' + getPinName(pinType) + ' 15 раз! (' + usage + '/15)\nЗатем разблокировать за 250💡');
+    return;
+  }
+  if (activePinType === pinType) { activePinType = null; notify('Рисование пина выключено'); return; }
+  activePinType = pinType;
+  col = PIN_COLORS[pinType] || col;
+  buildPal();
+  notify('✏️ Рисуешь пином ' + getPinName(pinType) + '! (раз в 5 мин)');
+}
+
+// Кулдаун пина встроен в placeG напрямую (см. выше в buy())
+
+function unlockPinDrawing(pin) {
+  if (!P) return;
+  const cost = 250;
+  if ((P.bulbs || 0) < cost) { notify('❌ Нужно 250💡!'); return; }
+  if ((P.unlockedPins || []).includes(pin)) { notify('Уже разблокирован!'); return; }
+  const usage = (P.pinUsage || {})[pin] || 0;
+  if (usage < 15) { notify('❌ Нужно использовать пин ' + getPinName(pin) + ' 15 раз! (' + usage + '/15)'); return; }
+  P.bulbs -= cost;
+  if (!P.unlockedPins) P.unlockedPins = [];
+  P.unlockedPins.push(pin);
+  saveP(); updS();
+  notify('✅ Рисование пина ' + getPinName(pin) + ' разблокировано!');
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: ОБНОВЛЕНИЕ МАГАЗИНА — добавляем секцию inkLimit
+// ═══════════════════════════════════════════════════════════
+
+// renderShop уже полностью переписан выше — этот блок удалён
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: ФИКС ЧЁРНЫХ ЦВЕТОВ В ПАЛИТРЕ (уже в buildPal,
+//    но переопределяем порог яркости для надёжности)
+// ═══════════════════════════════════════════════════════════
+
+// уже обработано через .clr.dark в CSS — дополнительно убеждаемся
+// что у тёмных цветов рамка белая при выборе (handled in style)
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: ОБНОВЛЕНИЕ checkDailyQuest — сброс доп. заданий
+// ═══════════════════════════════════════════════════════════
+
+function checkDailyQuest() {
+  if (!P) return;
+  const today = todayKey();
+  if (P.lastQuestDate !== today) {
+    P.lastQuestDate     = today;
+    P.questDone         = false;
+    P.questProgress     = 0;
+    P.bonusProgressDate = today;
+    P.bonusProgress     = {};
+    if (P.level >= 5) P.flagAvailable = true;
+    saveP(); updS();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ══ v1.3: ВЫЗОВ updateBonusProgress из existующих функций
+// ═══════════════════════════════════════════════════════════
+
+// buy() при покупке привата трекает прогресс бонусного задания — добавлено внутри buy()
+
+</script>
+<div id="pinsMenu"></div>
+
+<!-- ПРОФИЛЬ ИГРОКА -->
+<div id="profileModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:10005;display:none;flex-direction:column;align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--panel);border:2px solid var(--accent);border-radius:12px;padding:16px;width:min(320px,92vw);max-height:80vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent);">👤 ПРОФИЛЬ</div>
+      <span style="cursor:pointer;color:var(--red);font-size:18px;" onclick="document.getElementById('profileModal').style.display='none'">✕</span>
+    </div>
+    <div id="profileBody"></div>
+  </div>
+</div>
+
+<style>
+/* ── Секция inklimit в магазине ── */
+#inklimit-section{}
+/* ── Профиль ── */
+.profile-title{background:#1a1a28;border:1px solid var(--border);border-radius:6px;padding:8px 10px;display:flex;align-items:center;gap:10px;cursor:default;}
+.profile-title.has{border-color:var(--green);cursor:pointer;}
+.profile-title.sel{border-color:var(--accent);background:#1a1400;}
+
+/* ── Ивент-баннер (пульсация) ── */
+@keyframes banner-pulse{0%,100%{box-shadow:0 0 10px #ff9900;}50%{box-shadow:0 0 28px #ff9900,0 0 60px #ff990044;}}
+#eventBanner{position:fixed;top:50px;left:50%;transform:translateX(-50%);background:#ff9900;color:#000;font-family:'Press Start 2P',monospace;font-size:8px;padding:10px 20px;border-radius:8px;z-index:3000;display:none;text-align:center;animation:banner-pulse 2s infinite;white-space:nowrap;cursor:pointer;}
+
+/* ── Кнопки заданий побольше ── */
+.quest-card .bb{padding:10px;font-size:8px;width:100%;margin-top:5px;}
+#saveStreakBtn{background:#ff9900;border:2px solid #ff6600;color:#000;font-family:'Press Start 2P',monospace;font-size:8px;padding:12px;border-radius:8px;cursor:pointer;width:100%;margin:6px 0;}
+#saveStreakBtn:disabled{opacity:0.45;cursor:not-allowed;}
+
+/* ── Кулдаун рисования пина ── */
+.pin-cd{font-size:10px;color:#ff6b6b;font-family:'Press Start 2P',monospace;text-align:center;padding:4px;}
+
+/* ── Sky drops ── */
+@keyframes float-drop{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+.sky-drop-icon{font-size:28px;animation:float-drop 1s ease-in-out infinite;cursor:pointer;filter:drop-shadow(0 0 8px #f5c542);}
+
+/* ── Чёрный куб ── */
+.black-cube-px{animation:cube-pulse 1.5s infinite;}
+@keyframes cube-pulse{0%,100%{opacity:0.95;}50%{opacity:0.6;}}
+
+/* ── Пин в чате ── */
+.msg-pin{font-size:22px;display:inline-block;animation:pin-bounce 0.4s;}
+@keyframes pin-bounce{0%{transform:scale(0);}70%{transform:scale(1.2);}100%{transform:scale(1);}}
+
+/* ── Случайная награда дня — золотое мигание ── */
+.streak-day.gold{border-color:#f5c542;background:#1a1500;animation:gold-glow 1.5s infinite;}
+@keyframes gold-glow{0%,100%{box-shadow:none;}50%{box-shadow:0 0 12px #f5c54288;}}
+</style>
+</body>
+</html>
